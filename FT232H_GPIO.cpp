@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define APP_CHECK_STATUS(X)     if ((X)) {printf("Error %u line %u", (X), __LINE__);}
+#define APP_CHECK_STATUS(X)     if ((X)) {printf("Error %u line %u \n", (X), __LINE__);}
 
 // In MPSSE I2C ADBUS is used for synchronous serial communications (I2C/SPI/JTAG) and ACBUS is free to be used as GPIO
 
@@ -70,6 +70,7 @@ int main()
         cout << "Init Channel. Status: " << ftStatus << endl;
     }
 
+#ifndef USE_I2C
     // GPIO toggle
     uint8_t pin = PIN_C(0);
     for (int i = 0; i < 10; i++)
@@ -77,16 +78,14 @@ int main()
         ftStatus = FT_WriteGPIO(ftHandle, 1, 0xff);
         APP_CHECK_STATUS(ftStatus);
         cout << "> ON" << endl;
-        std::this_thread::sleep_for(1s);
+        std::this_thread::sleep_for(0.1s);
 
         ftStatus = FT_WriteGPIO(ftHandle, 1, 0);
         APP_CHECK_STATUS(ftStatus);
         cout << "> OFF" << endl;
-        std::this_thread::sleep_for(1s);
+        std::this_thread::sleep_for(0.1s);
     }
-
-#ifdef USE_I2C
-
+#else
     #define BME280_REGISTER_DEVICE_ID 0xd0
 
     UCHAR address = 0x76;
@@ -95,8 +94,12 @@ int main()
 	UCHAR regbuf[32];
 	FT_STATUS status;
 
-    status = i2c_read(ftHandle, address, BME280_REGISTER_DEVICE_ID, &rev);
-    APP_CHECK_STATUS(status);
+    for (int i = 0; i < 100; i++) {
+        status = i2c_read(ftHandle, address, BME280_REGISTER_DEVICE_ID, &rev);
+        APP_CHECK_STATUS(status);
+
+        std::this_thread::sleep_for(0.5s);
+    }
 #endif
 
     ftStatus = I2C_CloseChannel(ftHandle);
