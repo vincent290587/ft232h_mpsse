@@ -61,8 +61,24 @@ extern "C" void HalGPIOset(pinID_t pin_id, uint8 value) {
 
 static void _drv2605_test(void) {
 
-    Haptics_Init(0); // pin C0
+    for (UCHAR address = 1; address <= 127; address++) {
+        FT_STATUS ftStatus;
+        UCHAR value[5];
+        ftStatus = i2c_write_multi(ftHandle, address, value, 5);
 
+        if (!ftStatus) {
+            cout << " Ack on: 0x" << std::hex << address << endl;
+        }
+
+        std::this_thread::sleep_for(0.5s);
+    }
+
+//    for (int i = 0; i < 100; i++) {
+//
+//        Haptics_Init(PIN_C(0)); // pin C0
+//
+//        std::this_thread::sleep_for(0.5s);
+//    }
 }
 
 int main()
@@ -106,49 +122,17 @@ int main()
     {
         ChannelConfig channelConf;
         channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
-        channelConf.LatencyTimer = 10;
-        channelConf.Options = 0;
+        channelConf.LatencyTimer = 2;
+        channelConf.Options = 0b100;
 
         ftStatus = I2C_InitChannel(ftHandle, &channelConf);
         APP_CHECK_STATUS(ftStatus);
         cout << "Init Channel. Status: " << ftStatus << endl;
     }
 
-    _drv2605_test();
-
-//#ifndef USE_I2C
-//    // GPIO toggle
-//    uint8_t output_mask = 1 << PIN_C(1);
-//    uint8_t output_value = 1 << PIN_C(1);
-//
-//    for (int i = 0; i < 10; i++)
-//    {
-//        ftStatus = FT_WriteGPIO(ftHandle, output_mask, output_value);
-//        APP_CHECK_STATUS(ftStatus);
-//        cout << "> ON" << endl;
-//        std::this_thread::sleep_for(0.5s);
-//
-//        ftStatus = FT_WriteGPIO(ftHandle, output_mask, 0x00);
-//        APP_CHECK_STATUS(ftStatus);
-//        cout << "> OFF" << endl;
-//        std::this_thread::sleep_for(0.5s);
-//    }
-//#else
-//    #define BME280_REGISTER_DEVICE_ID 0xd0
-//
-//    UCHAR address = 0x76;
-//	UCHAR rev;
-//	UCHAR reg;
-//	UCHAR regbuf[32];
-//	FT_STATUS status;
-//
-//    for (int i = 0; i < 100; i++) {
-//        status = i2c_read(ftHandle, address, BME280_REGISTER_DEVICE_ID, &rev);
-//        APP_CHECK_STATUS(status);
-//
-//        std::this_thread::sleep_for(0.5s);
-//    }
-//#endif
+    {
+        _drv2605_test();
+    }
 
     ftStatus = I2C_CloseChannel(ftHandle);
     APP_CHECK_STATUS(ftStatus);
@@ -189,10 +173,8 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
     FT_STATUS status;
     DWORD xfer = 0;
 
-    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Read. */
     status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
-                             I2C_TRANSFER_OPTIONS_STOP_BIT |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
 
     if (status == FT_OK)
@@ -213,7 +195,6 @@ FT_STATUS i2c_write(FT_HANDLE ftHandle, UCHAR address, UCHAR value)
     FT_STATUS status;
     DWORD xfer = 0;
 
-    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Write (not autoincremented) */
     status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
                              I2C_TRANSFER_OPTIONS_STOP_BIT |
@@ -228,9 +209,9 @@ FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR
     FT_STATUS status;
     DWORD xfer = 0;
 
-    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Write (not autoincremented) */
     status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
+                             I2C_TRANSFER_OPTIONS_STOP_BIT |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
 
@@ -242,7 +223,6 @@ FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR valu
     FT_STATUS status;
     DWORD xfer = 0;
 
-    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Write (not autoincremented) */
     status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);

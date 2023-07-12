@@ -9,9 +9,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define B_TRUE    true
-#define B_FALSE   false
-
 #define uint8   uint8_t
 #define uint16  uint16_t
 
