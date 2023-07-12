@@ -7,14 +7,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS				ON)
 
 # libMPSSE - https://github.com/stephendpmurphy/ftdi_libMPSSE.git
-include(FetchContent)
-FetchContent_Declare(
-        libMPSSE
-        GIT_REPOSITORY https://github.com/stephendpmurphy/ftdi_libMPSSE.git
-        GIT_TAG        origin/main
-        SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/libMPSSE
-)
-FetchContent_MakeAvailable(libMPSSE)
+#include(FetchContent)
+#FetchContent_Declare(
+#        libMPSSE
+#        GIT_REPOSITORY https://github.com/stephendpmurphy/ftdi_libMPSSE.git
+#        GIT_TAG        origin/main
+#        SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/libMPSSE
+#)
+#FetchContent_MakeAvailable(libMPSSE)
+
+add_definitions(-DFTDIMPSSE_STATIC) # static lib
+
+add_subdirectory(./libMPSSE_1.0.3)
 
 add_executable(${PROJECT_NAME}
         FT232H_GPIO.cpp
