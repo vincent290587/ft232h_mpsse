@@ -14,7 +14,6 @@ using namespace std;
 // In MPSSE I2C ADBUS is used for synchronous serial communications (I2C/SPI/JTAG) and ACBUS is free to be used as GPIO
 
 #define PIN_C(X)     (X)
-#define PIN_D(X)     (X)
 
 FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value);
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length);
@@ -72,18 +71,20 @@ int main()
 
 #ifndef USE_I2C
     // GPIO toggle
-    uint8_t pin = PIN_C(0);
+    uint8_t output_mask = 1 << PIN_C(1);
+    uint8_t output_value = 1 << PIN_C(1);
+
     for (int i = 0; i < 10; i++)
     {
-        ftStatus = FT_WriteGPIO(ftHandle, 1, 0xff);
+        ftStatus = FT_WriteGPIO(ftHandle, output_mask, output_value);
         APP_CHECK_STATUS(ftStatus);
         cout << "> ON" << endl;
-        std::this_thread::sleep_for(0.1s);
+        std::this_thread::sleep_for(0.5s);
 
-        ftStatus = FT_WriteGPIO(ftHandle, 1, 0);
+        ftStatus = FT_WriteGPIO(ftHandle, output_mask, 0x00);
         APP_CHECK_STATUS(ftStatus);
         cout << "> OFF" << endl;
-        std::this_thread::sleep_for(0.1s);
+        std::this_thread::sleep_for(0.5s);
     }
 #else
     #define BME280_REGISTER_DEVICE_ID 0xd0
@@ -107,8 +108,8 @@ int main()
 
     Cleanup_libMPSSE();
 
-	cout << "Press Enter to Continue";
-	cin.ignore();
+//	cout << "Press Enter to Continue";
+//	cin.ignore();
 
 	return 0;
 }
