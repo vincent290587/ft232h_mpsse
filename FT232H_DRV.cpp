@@ -56,14 +56,17 @@ extern "C" void HalI2CInit(uint8 address) {
     m_i2c_address = address;
 }
 
-extern "C" void HalI2CWrite(uint16 length, const uint8 * const buffer) {
-    FT_STATUS status = i2c_write_multi(ftHandle, m_i2c_address, (PUCHAR)&buffer[0], (UCHAR)length);
+extern "C" int HalI2CWrite(uint8 * buffer, uint16 length) {
+    FT_STATUS status = i2c_write_multi(ftHandle, m_i2c_address, (PUCHAR)buffer, (UCHAR)length);
     APP_CHECK_STATUS(status);
+    std::this_thread::sleep_for(0.1s);
+    return -status;
 }
 
-extern "C" int HalSensorReadReg(uint8 addr, const uint8 * const buffer, uint16 length) {
+extern "C" int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length) {
     FT_STATUS status = i2c_read_multi(ftHandle, m_i2c_address, addr, (PUCHAR)buffer, (UCHAR)length);
     APP_CHECK_STATUS(status);
+    std::this_thread::sleep_for(0.1s);
     return -status;
 }
 
@@ -86,6 +89,8 @@ extern "C" void HalGPIOset(pinID_t pin_id, uint8 value) {
 static void _drv2605_test(void) {
 
 #if 0
+    m_i2c_address = 0x5A;
+
     for (UCHAR address = 1; address <= 127; address++) {
         FT_STATUS ftStatus;
         UCHAR value[5];
@@ -101,17 +106,49 @@ static void _drv2605_test(void) {
         APP_CHECK_STATUS(ftStatus);
         printf("Register STATUS: 0x%02X \n", value[0]);
 
+        value[0] = 0x01;
+        value[1] = 0x80 | 0x40;
+        ftStatus = i2c_write_multi(ftHandle, 0x5A, value, 2);
+        APP_CHECK_STATUS(ftStatus);
+//        Haptics_selectLibrary(1);
+
         std::this_thread::sleep_for(0.5s);
     }
-#endif
+#else
 
+    Haptics_Init(PIN_C(0)); // pin C0
 
     for (int i = 0; i < 4; i++) {
 
-        Haptics_Init(PIN_C(0)); // pin C0
-
         std::this_thread::sleep_for(0.5s);
+
     }
+#endif
+
+#if 1
+    uint8 effect = 1;
+    for (int i = 0; i < 80; i++) {
+#if 1
+        LOG("Effect %u \n", effect);
+        // set the effect to play
+        Haptics_setWaveform(0, effect);  // play effect
+        Haptics_setWaveform(1, 0);       // end waveform
+
+        effect++;
+#else
+        LOG("ramp up medium 1 \n");
+        Haptics_selectLibrary(1);
+        Haptics_setWaveform(0, 84);  // ramp up medium 1, see datasheet part 11.2
+        Haptics_setWaveform(1, 1);  // strong click 100%, see datasheet part 11.2
+        Haptics_setWaveform(2, 0);  // end of waveforms
+#endif
+
+        // play the effect!
+        Haptics_go(1);
+
+        std::this_thread::sleep_for(0.2s);
+    }
+#endif
 }
 
 int main()
@@ -155,12 +192,14 @@ int main()
     {
         ChannelConfig channelConf;
         channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
-        channelConf.LatencyTimer = 20;
+        channelConf.LatencyTimer = 2;
         channelConf.Options = 0;
 
         ftStatus = I2C_InitChannel(ftHandle, &channelConf);
         APP_CHECK_STATUS(ftStatus);
         cout << "Init Channel. Status: " << ftStatus << endl;
+
+        std::this_thread::sleep_for(1s);
     }
 
     {
@@ -178,28 +217,28 @@ int main()
     return 0;
 }
 
-FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value)
-{
-    FT_STATUS status;
-    DWORD xfer = 0;
-
-    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Read. */
-    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
-                             I2C_TRANSFER_OPTIONS_START_BIT |
-                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-
-    if (status == FT_OK)
-    {
-        /* Repeated Start condition generated. */
-        status = I2C_DeviceRead(ftHandle, address, 1, value, &xfer,
-                                I2C_TRANSFER_OPTIONS_START_BIT |
-                                I2C_TRANSFER_OPTIONS_STOP_BIT |
-                                I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-    }
-    APP_CHECK_STATUS(status);
-
-    return status;
-}
+//FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value)
+//{
+//    FT_STATUS status;
+//    DWORD xfer = 0;
+//
+//    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Read. */
+//    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
+//                             I2C_TRANSFER_OPTIONS_START_BIT |
+//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+//
+//    if (status == FT_OK)
+//    {
+//        /* Repeated Start condition generated. */
+//        status = I2C_DeviceRead(ftHandle, address, 1, value, &xfer,
+//                                I2C_TRANSFER_OPTIONS_START_BIT |
+//                                I2C_TRANSFER_OPTIONS_STOP_BIT |
+//                                I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
+//    }
+//    APP_CHECK_STATUS(status);
+//
+//    return status;
+//}
 
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length)
 {
@@ -223,40 +262,35 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
     return status;
 }
 
-FT_STATUS i2c_write(FT_HANDLE ftHandle, UCHAR address, UCHAR value)
-{
-    FT_STATUS status;
-    DWORD xfer = 0;
-
-    status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
-                             I2C_TRANSFER_OPTIONS_START_BIT |
-                             I2C_TRANSFER_OPTIONS_STOP_BIT |
-                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-    APP_CHECK_STATUS(status);
-
-    return status;
-}
+//FT_STATUS i2c_write(FT_HANDLE ftHandle, UCHAR address, UCHAR value)
+//{
+//    FT_STATUS status;
+//    DWORD xfer = 0;
+//
+//    status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
+//                             I2C_TRANSFER_OPTIONS_START_BIT |
+//                             I2C_TRANSFER_OPTIONS_STOP_BIT |
+//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+//    APP_CHECK_STATUS(status);
+//
+//    return status;
+//}
 
 FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
     DWORD xfer = 0;
 
+#if 0
     status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
                              I2C_TRANSFER_OPTIONS_STOP_BIT |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
+#else
+//    printf();
 
-    return status;
-}
-
-FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR value)
-{
-    FT_STATUS status;
-    DWORD xfer = 0;
-
-    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
+    status = I2C_DeviceWrite(ftHandle, address, 1, &value[0], &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
@@ -264,12 +298,35 @@ FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR valu
     if (status == FT_OK)
     {
         /* Register address not sent on register write. */
-        status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
+        status = I2C_DeviceWrite(ftHandle, address, length-1, &value[1], &xfer,
                                  I2C_TRANSFER_OPTIONS_NO_ADDRESS |
                                  I2C_TRANSFER_OPTIONS_STOP_BIT |
                                  I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
         APP_CHECK_STATUS(status);
     }
-
+#endif
     return status;
 }
+
+//FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR value)
+//{
+//    FT_STATUS status;
+//    DWORD xfer = 0;
+//
+//    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
+//                             I2C_TRANSFER_OPTIONS_START_BIT |
+//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+//    APP_CHECK_STATUS(status);
+//
+//    if (status == FT_OK)
+//    {
+//        /* Register address not sent on register write. */
+//        status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
+//                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
+//                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
+//                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+//        APP_CHECK_STATUS(status);
+//    }
+//
+//    return status;
+//}
