@@ -30,9 +30,14 @@ add_executable(${PROJECT_NAME}_drv2605
         FT232H_DRV.cpp
         )
 
+add_executable(${PROJECT_NAME}_bme280
+        FT232H_BME280.c
+        )
+
 target_include_directories(libDRV2605 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(${PROJECT_NAME}_gpio FTDI_MPSSE_Lib libDRV2605)
 target_link_libraries(${PROJECT_NAME}_drv2605 FTDI_MPSSE_Lib libDRV2605)
+target_link_libraries(${PROJECT_NAME}_bme280 FTDI_MPSSE_Lib libDRV2605)
 
 file( GENERATE OUTPUT "${CMAKE_BINARY_DIR}/.gitignore" CONTENT "*" )
