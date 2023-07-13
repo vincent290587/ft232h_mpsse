@@ -72,8 +72,8 @@ int WriteRegister (u8 reg, u16 value) {
     u8 buffer[3];
     buffer[0] = reg;
 
-    buffer[1] = value % 0xFF; // TODO endianness
-    buffer[2] = value >> 8;
+    buffer[1] = value & 0xFF;
+    buffer[2] = (value >> 8) & 0xFF;
 
     int ret = HalI2CWrite(buffer, 3);
 
@@ -86,9 +86,9 @@ u16 ReadRegister (u8 reg)  {
     u8 buffer[2];
     int ret = HalSensorReadReg(reg, buffer, 2);
 
-    u16 val = (buffer[0] << 8) | buffer[1]; // TODO endianness
+    u16 val = buffer[0] | (buffer[1] << 8);
 
-    return ret;
+    return val;
 
 }
 
@@ -110,20 +110,18 @@ void WriteAndVerifyRegister (u8 RegisterAddress, u16 RegisterValueToWrite){
 
 void MAX17055_init(void) {
 
-    u16 designCap = 0x1450;
-    u16 ichgterm = 0x333;
-    u16 modelcfg = 0x8000;
-    u16 QRTable00 = 0x1050;
-    u16 QRTable10 = 0x2012;
-    u16 VEmpty = 0xa561;
-    u16 RCOMP0 = 0x004d;
-    u16 TempCo = 0x223e;
+    // Configure ModelCfg.ModelID = 6 to enable LiFePO4 mode
+
+    u16 designCap = 0x190; // LSB = 0.5mah with 0.01 ohms
+    u16 ichgterm = 0x333; // LSB = 1.5625μV/RSENSE
+    u16 modelcfg = 0x8000 | (6u << 4u);
+    u16 VEmpty = 0x8C02; // LSB = 0.078125mV
 
     float ChargeVoltage = 3.6f;
 
     u16 dQAcc = (designCap / 32);
 
-    u16 StatusPOR = ReadRegister(0x00) & 0x0002;
+    u16 StatusPOR = ReadRegister(MAX17055_STATUS_REG) & 0x0002;
 
     if (StatusPOR==0){
         goto Step_4_3;
@@ -131,61 +129,57 @@ void MAX17055_init(void) {
 
 Step_2:
 
-    while(ReadRegister(0x3D)&1) {
+    while(ReadRegister(MAX17055_FSTAT_REG) & 0x1) {
         Haptics_WaitUs(10000);
     } //do not continue until FSTAT.DNR == 0
 
 Step_3:
 
     {
-        u16 HibCFG = ReadRegister(0xBA); //Store original HibCFG value
-        WriteRegister(0x60, 0x90); // Exit Hibernate Mode step 1
-        WriteRegister(0xBA, 0x0); // Exit Hibernate Mode step 2
-        WriteRegister(0x60, 0x0); // Exit Hibernate Mode step 3
+        u16 HibCFG = ReadRegister(MAX17055_HIBCFG_REG); //Store original HibCFG value
+        WriteRegister(MAX17055_VFSOC0_QH0_LOCK_REG, 0x90); // Exit Hibernate Mode step 1
+        WriteRegister(MAX17055_HIBCFG_REG, 0x0); // Exit Hibernate Mode step 2
+        WriteRegister(MAX17055_VFSOC0_QH0_LOCK_REG, 0x0); // Exit Hibernate Mode step 3
 
         // 3.1 OPTION 1 EZ Config (no INI file is needed):
 
-        WriteRegister(0x18, designCap); // Write DesignCap
-        WriteRegister(0x45, dQAcc); //Write dQAcc
-        WriteRegister(0x1E, ichgterm); // Write IchgTerm
-        WriteRegister(0x3A, VEmpty); // Write VEmpty
+        WriteRegister(MAX17055_DESIGNCAP_REG, designCap); // Write DesignCap
+        WriteRegister(MAX17055_DQACC_REG, dQAcc); //Write dQAcc
+        WriteRegister(MAX17055_ICHGTERM_REG, ichgterm); // Write IchgTerm
+        WriteRegister(MAX17055_VEMPTY_REG, VEmpty); // Write VEmpty
         //Only use integer portion of dQAcc=int(DesignCap/32) in the calculation of dPAcc to avoid quantization of FullCapNom
-        if (ChargeVoltage > 4.275) {
-            WriteRegister(0x46, dQAcc * 51200 / designCap); // Write dPAcc
-            WriteRegister(0xDB, 0x8400); // Write ModelCFG
+        if (ChargeVoltage > 4.275f) {
+            WriteRegister(MAX17055_DPACC_REG, dQAcc * 51200 / designCap); // Write dPAcc
+            WriteRegister(MAX17055_MODELCFG_REG, modelcfg | 0x400); // Write ModelCFG
         } else {
-            WriteRegister(0x46, dQAcc * 44138 / designCap); //Write dPAcc
-            WriteRegister(0xDB, 0x8000); // Write ModelCFG
+            WriteRegister(MAX17055_DPACC_REG, dQAcc * 44138 / designCap); //Write dPAcc
+            WriteRegister(MAX17055_MODELCFG_REG, modelcfg); // Write ModelCFG
         }
-//Poll ModelCFG.Refresh(highest bit), proceed to Step 4 when ModelCFG.Refresh = 0.
-        while (ReadRegister(0xDB) & 0x8000) {
+        //Poll ModelCFG.Refresh(highest bit), proceed to Step 4 when ModelCFG.Refresh = 0.
+        while (ReadRegister(MAX17055_MODELCFG_REG) & 0x8000) {
             Haptics_WaitUs(10000); //10ms wait loop. Do not continue until ModelCFG.Refresh == 0.
         }
 
-
-        WriteRegister(0xBA, HibCFG); // Restore Original HibCFG value
+        WriteRegister(MAX17055_HIBCFG_REG, HibCFG); // Restore Original HibCFG value
     }
     // Proceed to Step 4.
 
 Step_4_0:
 
     {
-        u16 Status = ReadRegister(0x00); //Read Status
-        WriteAndVerifyRegister(0x00, Status
-        &
-        0xFFFD); //Write and Verify Status with POR bit cleared
+        u16 Status = ReadRegister(MAX17055_STATUS_REG); //Read Status
+        WriteAndVerifyRegister(MAX17055_STATUS_REG, Status & 0xFFFD); //Write and Verify Status with POR bit cleared
 
-        Status = ReadRegister(0x00); //Read Status
-        WriteAndVerifyRegister(0x00, Status
-        &
-        0xFFFD); //Write and Verify Status with POR bit cleared
+        Status = ReadRegister(MAX17055_STATUS_REG); //Read Status
+        WriteAndVerifyRegister(MAX17055_STATUS_REG, Status & 0xFFFD); //Write and Verify Status with POR bit cleared
     }
 
 Step_4_3:
 
     {
-        u16 RepCap = ReadRegister(0x05); //Read RepCap
-        u16 RepSOC = ReadRegister(0x06); //Read RepSOC
+        u16 RepCap = ReadRegister(MAX17055_REPCAP_REG); //Read RepCap
+        u16 RepSOC = ReadRegister(MAX17055_REPSOC_REG); //Read RepSOC
+        u16 TTE = ReadRegister(MAX17055_TTE_REG) ; //Read TTE
      }
 
 }
