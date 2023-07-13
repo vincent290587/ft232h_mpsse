@@ -9,9 +9,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define uint8   uint8_t
-#define uint16  uint16_t
-
 #define u8   uint8_t
 #define u16  uint16_t
 
