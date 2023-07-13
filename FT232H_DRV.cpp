@@ -8,12 +8,36 @@
 #include <libmpsse_i2c.h>
 
 #include "Haptics_2605.h"
+#include "DRV2605.h"
 
 using namespace std;
 
 #define APP_CHECK_STATUS(X)     if ((X)) {printf("Error %u line %u \n", (X), __LINE__);}
 
 // In MPSSE I2C ADBUS is used for synchronous serial communications (I2C/SPI/JTAG) and ACBUS is free to be used as GPIO
+
+
+//Like the FT232H guide mentions, when using I2C you'll need to setup your circuit with external pull-up resistors connected to the I2C clock and data lines.  This is necessary because the FT232H is a general purpose chip which doesn't include built-in pull-up resistors.
+//
+//As a quick summary of the I2C wiring, make the following connections:
+//
+//Connect FT232H D1 and D2 together with a jumper wire.  This combined connection is the I2C SDA data line.
+//Add a 4.7 kilo-ohm resistor from the I2C SDA data line (pins D1 and D2 above) up to FT232H 5V.
+//Add a 4.7 kilo-ohm resistor from FT232H D0 up to FT232H 5V.  This pin D0 is the I2C SCL clock line.
+//Next wire your I2C device to the FT232H SDA and SCL lines just as you would for a Raspberry Pi or BeagleBone Black.  For other digital pins on the device, such as chip select, reset, data, etc., you should connect those pins to any free GPIO pins on the FT232H, such as C0 to C7 (GPIO numbers 8 to 15).
+//
+//For device power you can use the 5V pin on the FT232H board to supply up to ~500mA of 5 volt power.  Also remember the FT232H board digital outputs operate at 3.3 volts and the digital inputs can safely accept either 3.3 volts or 5 volts.
+//
+//Note with the setup above the I2C pins SDA and SCL will be pulled up to 5 volts when idle!  Make sure your I2C device can handle this voltage (Adafruit breakout boards, unless noted otherwise, are made to handle 5 volts). If you are using a 3.3V device, simply connect the pullups to 3.3V instead of 5V
+
+
+//To use one of these devices you'll first want to first read the device's tutorial to get an overview of its connections and library usage.  Then connect the device to the FT232H breakout just like you're connecting the device to a Raspberry Pi or BeagleBone Black, but with the following SPI connections:
+//
+//Device SCLK or clock to FT232H D0 / serial clock.
+//Device MOSI or data in to FT232H D1 / serial output.
+//Device MISO or data out to FT232H D2 / serial input.
+//For other digital pins on the device, such as chip select, reset, data, etc., you should connect those pins to any free GPIO pins on the FT232H, such as C0 to C7 (GPIO numbers 8 to 15).
+
 
 #define PIN_C(X)     (X)
 
@@ -61,24 +85,33 @@ extern "C" void HalGPIOset(pinID_t pin_id, uint8 value) {
 
 static void _drv2605_test(void) {
 
+#if 0
     for (UCHAR address = 1; address <= 127; address++) {
         FT_STATUS ftStatus;
         UCHAR value[5];
-        ftStatus = i2c_write_multi(ftHandle, address, value, 5);
 
-        if (!ftStatus) {
-            cout << " Ack on: 0x" << std::hex << address << endl;
-        }
+//        ftStatus = i2c_write_multi(ftHandle, 0x5A, value, 5);
+//
+//        if (!ftStatus) {
+//          printf("Ack on: 0x%02X \n", address);
+//        }
+
+//        ftStatus = i2c_read(ftHandle, 0x5A, DRV2605_STATUS, value);
+        ftStatus = i2c_read_multi(ftHandle, 0x5A, DRV2605_STATUS, value, 1);
+        APP_CHECK_STATUS(ftStatus);
+        printf("Register STATUS: 0x%02X \n", value[0]);
 
         std::this_thread::sleep_for(0.5s);
     }
+#endif
 
-//    for (int i = 0; i < 100; i++) {
-//
-//        Haptics_Init(PIN_C(0)); // pin C0
-//
-//        std::this_thread::sleep_for(0.5s);
-//    }
+
+    for (int i = 0; i < 4; i++) {
+
+        Haptics_Init(PIN_C(0)); // pin C0
+
+        std::this_thread::sleep_for(0.5s);
+    }
 }
 
 int main()
@@ -122,8 +155,8 @@ int main()
     {
         ChannelConfig channelConf;
         channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
-        channelConf.LatencyTimer = 2;
-        channelConf.Options = 0b100;
+        channelConf.LatencyTimer = 20;
+        channelConf.Options = 0;
 
         ftStatus = I2C_InitChannel(ftHandle, &channelConf);
         APP_CHECK_STATUS(ftStatus);

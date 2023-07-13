@@ -148,33 +148,33 @@ typedef enum I2C_ClockRate_t{
 /**/
 typedef struct ChannelConfig_t
 {
-	I2C_CLOCKRATE	ClockRate; 
-	/** There were 2 functions I2C_TurnOn/OffDivideByFive
-	ClockinghiSpeedDevice (FTC_HANDLE fthandle) in the old DLL. This function turns on the
-	divide by five for the MPSSE clock to allow the hi-speed devices FT2232H and FT4232H to
-	clock at the same rate as the FT2232D device. This allows for backward compatibility
-	NOTE: This feature is probably a per chip feature and not per device*/
+    /** There were 2 functions I2C_TurnOn/OffDivideByFive
+    ClockinghiSpeedDevice (FTC_HANDLE fthandle) in the old DLL. This function turns on the
+    divide by five for the MPSSE clock to allow the hi-speed devices FT2232H and FT4232H to
+    clock at the same rate as the FT2232D device. This allows for backward compatibility
+    NOTE: This feature is probably a per chip feature and not per device*/
+	I2C_CLOCKRATE	ClockRate;
 
-	UCHAR			LatencyTimer; 
-	/** Required value, in milliseconds, of latency timer.
-	Valid range is 2 � 255
-	In the FT8U232AM and FT8U245AM devices, the receive buffer timeout that is used to flush
-	remaining data from the receive buffer was fixed at 16 ms. In all other FTDI devices, this
-	timeout is programmable and can be set at 1 ms intervals between 2ms and 255 ms.  This
-	allows the device to be better optimized for protocols requiring faster response times from
-	short data packets
-	NOTE: This feature is probably a per chip feature and not per device*/
+    /** Required value, in milliseconds, of latency timer.
+    Valid range is 2 - 255
+    In the FT8U232AM and FT8U245AM devices, the receive buffer timeout that is used to flush
+    remaining data from the receive buffer was fixed at 16 ms. In all other FTDI devices, this
+    timeout is programmable and can be set at 1 ms intervals between 2ms and 255 ms.  This
+    allows the device to be better optimized for protocols requiring faster response times from
+    short data packets
+    NOTE: This feature is probably a per chip feature and not per device*/
+	UCHAR			LatencyTimer;
 
-	DWORD			Options;	
-	/** This member provides a way to enable/disable features
-	specific to the protocol that are implemented in the chip
-	BIT0		: 3PhaseDataClocking - Setting this bit will turn on 3 phase data clocking for a
-			FT2232H dual hi-speed device or FT4232H quad hi-speed device. Three phase
-			data clocking, ensures the data is valid on both edges of a clock
-	BIT1		: Loopback
-	BIT2		: Clock stretching
-	BIT3 -BIT31		: Reserved
-	*/
+    /** This member provides a way to enable/disable features
+    specific to the protocol that are implemented in the chip
+    BIT0		: 3PhaseDataClocking - Setting this bit will turn on 3 phase data clocking for a
+            FT2232H dual hi-speed device or FT4232H quad hi-speed device. Three phase
+            data clocking, ensures the data is valid on both edges of a clock
+    BIT1		: Loopback
+    BIT2		: Clock stretching
+    BIT3 -BIT31		: Reserved
+    */
+	DWORD			Options;
 } ChannelConfig;
 
 /******************************************************************************/

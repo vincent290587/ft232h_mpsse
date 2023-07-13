@@ -14,6 +14,10 @@
 
 #define pinID_t uint16
 
+#define LOG(...)    printf(__VA_ARGS__)
+
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
