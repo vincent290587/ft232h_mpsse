@@ -5,6 +5,59 @@
 #include "MAX17055.h"
 #include "hal_i2c.h"
 
+#define BIT(X)       (1 << (X))
+
+#define MAX17055_DEVICE_ID          0x4010
+
+/* Config reg (0x1d) flags */
+#define CONF_AEN                    BIT(2)
+#define CONF_IS                     BIT(11)
+#define CONF_VS                     BIT(12)
+#define CONF_TS                     BIT(13)
+#define CONF_SS                     BIT(14)
+#define CONF_TSEL                   BIT(15)
+#define CONF_ALL_STICKY             (CONF_IS | CONF_VS | CONF_TS | CONF_SS)
+
+/* Status reg (0x00) flags */
+#define STATUS_POR                  BIT(1)
+#define STATUS_IMN                  BIT(2)
+#define STATUS_BST                  BIT(3)
+#define STATUS_IMX                  BIT(6)
+#define STATUS_VMN                  BIT(8)
+#define STATUS_TMN                  BIT(9)
+#define STATUS_SMN                  BIT(10)
+#define STATUS_VMX                  BIT(12)
+#define STATUS_TMX                  BIT(13)
+#define STATUS_SMX                  BIT(14)
+#define STATUS_ALL_ALRT                                                    \
+	(STATUS_IMN | STATUS_IMX | STATUS_VMN | STATUS_VMX | STATUS_TMN |      \
+	 STATUS_TMX | STATUS_SMN | STATUS_SMX)
+
+#define BATTERY_MAX17055_RSENSE_MUL 500
+#define BATTERY_MAX17055_RSENSE_DIV 1000
+
+#define MAX17055_MAX_MIN_REG(mx, mn) ((((int16_t)(mx)) << 8) | ((mn)))
+/* Converts voltages alert range for VALRTTH_REG */
+#define MAX17055_VALRTTH_RESOLUTION 20
+#define MAX17055_VALRTTH_REG(mx, mn)                                           \
+	MAX17055_MAX_MIN_REG((uint8_t)(mx / MAX17055_VALRTTH_RESOLUTION),      \
+			     (uint8_t)(mn / MAX17055_VALRTTH_RESOLUTION))
+/* Converts temperature alert range for TALRTTH_REG */
+#define MAX17055_TALRTTH_REG(mx, mn)                                           \
+	MAX17055_MAX_MIN_REG((int8_t)(mx), (int8_t)(mn))
+/* Converts state-of-charge alert range for SALRTTH_REG */
+#define MAX17055_SALRTTH_REG(mx, mn)                                           \
+	MAX17055_MAX_MIN_REG((uint8_t)(mx), (uint8_t)(mn))
+/* Converts current alert range for IALRTTH_REG */
+/* Current resolution: 0.4mV/RSENSE */
+#define MAX17055_IALRTTH_MUL (10)
+#define MAX17055_IALRTTH_DIV (4)
+#define MAX17055_IALRTTH_REG(mx, mn)                                           \
+	MAX17055_MAX_MIN_REG(                                                  \
+		(int8_t)(mx * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)),    \
+		(int8_t)(mn * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)))
+
+
 enum max17055_register{
     MAX17055_STATUS_REG                 = 0x00,
     MAX17055_VALRTTH_REG                = 0x01,
@@ -107,6 +160,31 @@ void WriteAndVerifyRegister (u8 RegisterAddress, u16 RegisterValueToWrite){
 
 }
 
+void MAX17055_EnableIAlert(void) {
+
+    // https://chromium.googlesource.com/chromiumos/platform/ec/+/master/driver/battery/max17055.c
+
+    // Initial Value: 0x2210 for Config, 0x3658 for Config2
+
+    u16 cfg1 = ReadRegister(MAX17055_CONFIG_REG);
+    u16 cfg2 = ReadRegister(MAX17055_CONFIG2_REG);
+    u16 st = ReadRegister(MAX17055_STATUS_REG);
+
+    // Aen: CFG1 D2 (Enable ALRT Pin Output)
+    // When Aen = 1, violation if any of the alert threshold register values by
+    // temperature, voltage, current, or SOC triggers an alert. This bit affects the ALRT pin operation only
+
+    u16 i_alert_mxmn = MAX17055_IALRTTH_REG(8, 2); // 0.4mV/RSENSE resolution => 40mA with 0.01 ohms => 4mA with 0.1 ohms
+    printf("Setting IAlert to 0x%04X \n", i_alert_mxmn);
+
+    WriteRegister(MAX17055_IALRTTH_REG, i_alert_mxmn);
+	/* Disable all sticky bits; enable alert AEN */
+    WriteRegister(MAX17055_CONFIG_REG, (cfg1 & ~CONF_ALL_STICKY) | CONF_AEN);
+	/* Clear alerts */
+    WriteRegister(MAX17055_STATUS_REG, st & ~STATUS_ALL_ALRT);
+}
+
+// COMMSH: CFG1 D6 (Communication Shutdown):
 
 void MAX17055_init(void) {
 
@@ -117,9 +195,15 @@ void MAX17055_init(void) {
     u16 modelcfg = 0x8000 | (6u << 4u);
     u16 VEmpty = 0x8C02; // LSB = 0.078125mV
 
+    u16 chg_V_high = 51200; // scaling factor high voltage charger
+    u16 chg_V_low = 44138;
+
     float ChargeVoltage = 3.6f;
 
-    u16 dQAcc = (designCap / 32);
+    u16 dQAcc = (designCap >> 5);
+
+    u16 version = ReadRegister(MAX17055_VERSION_REG);
+    LOG("MAX17055 ID: %u vs %u \n", version, MAX17055_DEVICE_ID);
 
     u16 StatusPOR = ReadRegister(MAX17055_STATUS_REG) & 0x0002;
 
@@ -149,10 +233,10 @@ Step_3:
         WriteRegister(MAX17055_VEMPTY_REG, VEmpty); // Write VEmpty
         //Only use integer portion of dQAcc=int(DesignCap/32) in the calculation of dPAcc to avoid quantization of FullCapNom
         if (ChargeVoltage > 4.275f) {
-            WriteRegister(MAX17055_DPACC_REG, dQAcc * 51200 / designCap); // Write dPAcc
+            WriteRegister(MAX17055_DPACC_REG, dQAcc * chg_V_high / designCap); // Write dPAcc
             WriteRegister(MAX17055_MODELCFG_REG, modelcfg | 0x400); // Write ModelCFG
         } else {
-            WriteRegister(MAX17055_DPACC_REG, dQAcc * 44138 / designCap); //Write dPAcc
+            WriteRegister(MAX17055_DPACC_REG, dQAcc * chg_V_low / designCap); //Write dPAcc
             WriteRegister(MAX17055_MODELCFG_REG, modelcfg); // Write ModelCFG
         }
         //Poll ModelCFG.Refresh(highest bit), proceed to Step 4 when ModelCFG.Refresh = 0.

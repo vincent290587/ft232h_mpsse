@@ -15,6 +15,8 @@ extern "C" {
 
 void MAX17055_init(void);
 
+void MAX17055_EnableIAlert(void);
+
 #ifdef __cplusplus
 }
 #endif

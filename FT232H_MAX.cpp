@@ -41,15 +41,14 @@ using namespace std;
 #define PIN_C(X)     (X)
 
 static FT_HANDLE ftHandle;
-static UCHAR m_i2c_address;
 
 FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value);
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length);
-FT_STATUS i2c_write(FT_HANDLE ftHandle, UCHAR address, UCHAR value);
 FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR length);
-FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR value);
 
 /////////////////////////////////////////////////////////////////////////////////////
+
+static UCHAR m_i2c_address = 0x36;
 
 extern "C" void HalI2CInit(uint8 address) {
     m_i2c_address = address;
@@ -139,6 +138,8 @@ int main()
 
     {
         MAX17055_init();
+
+        MAX17055_EnableIAlert();
     }
 
     ftStatus = I2C_CloseChannel(ftHandle);
@@ -151,29 +152,6 @@ int main()
 
     return 0;
 }
-
-//FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value)
-//{
-//    FT_STATUS status;
-//    DWORD xfer = 0;
-//
-//    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Read. */
-//    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
-//                             I2C_TRANSFER_OPTIONS_START_BIT |
-//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//
-//    if (status == FT_OK)
-//    {
-//        /* Repeated Start condition generated. */
-//        status = I2C_DeviceRead(ftHandle, address, 1, value, &xfer,
-//                                I2C_TRANSFER_OPTIONS_START_BIT |
-//                                I2C_TRANSFER_OPTIONS_STOP_BIT |
-//                                I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-//    }
-//    APP_CHECK_STATUS(status);
-//
-//    return status;
-//}
 
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length)
 {
