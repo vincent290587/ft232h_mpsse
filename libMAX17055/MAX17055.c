@@ -57,6 +57,7 @@
 		(uint8_t)(mx * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)),    \
 		(uint8_t)(mn * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)))
 
+#define CURRENT_CONV(REG)       (((REG * 25) >> 4) * BATTERY_MAX17055_RSENSE_DIV / BATTERY_MAX17055_RSENSE_MUL)
 
 enum max17055_register{
     MAX17055_STATUS_REG                 = 0x00,
@@ -208,7 +209,8 @@ void MAX17055_PrintTLM(void) {
         WriteRegister(MAX17055_STATUS_REG, st & ~STATUS_ALL_ALRT);
     }
 
-
+    u16 cu = ReadRegister(MAX17055_CURRENT_REG);
+    LOG("Current: %.1f mA\n", CURRENT_CONV((int16_t)cu) / 1000.f);
 }
 
 // COMMSH: CFG1 D6 (Communication Shutdown):
@@ -225,7 +227,7 @@ void MAX17055_init(void) {
     u16 chg_V_high = 51200; // scaling factor high voltage charger
     u16 chg_V_low = 44138;
 
-    float ChargeVoltage = 3.6f;
+    const float ChargeVoltage = 3.6f;
 
     u16 dQAcc = (designCap >> 5);
 
