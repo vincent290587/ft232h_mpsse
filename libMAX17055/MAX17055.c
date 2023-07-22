@@ -33,7 +33,7 @@
 	(STATUS_IMN | STATUS_IMX | STATUS_VMN | STATUS_VMX | STATUS_TMN |      \
 	 STATUS_TMX | STATUS_SMN | STATUS_SMX)
 
-#define BATTERY_MAX17055_RSENSE_MUL 500
+#define BATTERY_MAX17055_RSENSE_MUL 200
 #define BATTERY_MAX17055_RSENSE_DIV 1000
 
 #define MAX17055_MAX_MIN_REG(mx, mn) ((((int16_t)(mx)) << 8) | ((mn)))
@@ -115,6 +115,7 @@ enum max17055_register{
     MAX17055_HIBCFG_REG                 = 0xBA,
     MAX17055_CONFIG2_REG                = 0xBB,
 
+    MAX17055_RSENSE_REG                 = 0xD0,
     MAX17055_MODELCFG_REG               = 0xDB,
 
     MAX17055_OCV_REG                    = 0xFB,
@@ -180,7 +181,10 @@ void MAX17055_EnableIAlert(void) {
     // When Aen = 1, violation if any of the alert threshold register values by
     // temperature, voltage, current, or SOC triggers an alert. This bit affects the ALRT pin operation only
 
-    u16 i_alert_mxmn = MAX17055_IALRTTH_REG_VAL(102, -15); // 0.4mV/RSENSE resolution => 40mA with 0.01 ohms => 4mA with 0.1 ohms
+    int8_t minC_mA = -8;
+    int LSB_val_inv = 4000 * BATTERY_MAX17055_RSENSE_DIV / (10 * BATTERY_MAX17055_RSENSE_MUL);
+    LOG("minC_LSB %d uA \n", LSB_val_inv);
+    u16 i_alert_mxmn = MAX17055_IALRTTH_REG_VAL(1002, minC_mA); // 0.4mV/RSENSE resolution => 40mA with 0.01 ohms => 4mA with 0.1 ohms
     LOG("Setting IAlert to 0x%04X \n", i_alert_mxmn);
 
     WriteRegister(MAX17055_IALRTTH_REG, i_alert_mxmn);
@@ -234,6 +238,8 @@ void MAX17055_init(void) {
     if (version != MAX17055_DEVICE_ID) {
         return;
     }
+
+    WriteRegister(MAX17055_RSENSE_REG, BATTERY_MAX17055_RSENSE_MUL * 100000u / BATTERY_MAX17055_RSENSE_DIV);
 
     u16 Status1 = ReadRegister(MAX17055_STATUS_REG);
     LOG("MAX17055 ST1: %04X \n", Status1);
