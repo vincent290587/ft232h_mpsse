@@ -123,12 +123,13 @@ enum max17055_register{
 int WriteRegister (u8 reg, u16 value) {
 
     u8 buffer[3];
+
     buffer[0] = reg;
 
     buffer[1] = value & 0xFF;
     buffer[2] = (value >> 8) & 0xFF;
 
-    int ret = HalI2CWrite(buffer, 3);
+    int ret = HalI2CWrite(buffer, sizeof(buffer));
 
     return ret;
 }
@@ -136,8 +137,8 @@ int WriteRegister (u8 reg, u16 value) {
 
 u16 ReadRegister (u8 reg)  {
 
-    u8 buffer[2];
-    int ret = HalSensorReadReg(reg, buffer, 2);
+    u8 buffer[2] = { 0xFF, 0xFF };
+    int ret = HalSensorReadReg(reg, buffer, sizeof(buffer));
 
     u16 val = buffer[0] | (buffer[1] << 8);
 
@@ -153,7 +154,7 @@ void WriteAndVerifyRegister (u8 RegisterAddress, u16 RegisterValueToWrite){
     do {
 
         WriteRegister (RegisterAddress, RegisterValueToWrite);
-        Haptics_WaitUs(1000); //1ms
+        Hal_WaitUs(1000); //1ms
         RegisterValueRead = ReadRegister (RegisterAddress) ;
 
     } while (RegisterValueToWrite != RegisterValueRead && attempt++<3);
@@ -202,20 +203,34 @@ void MAX17055_init(void) {
 
     u16 dQAcc = (designCap >> 5);
 
+    HalI2CInit(0x36);
+
     u16 version = ReadRegister(MAX17055_VERSION_REG);
-    LOG("MAX17055 ID: %u vs %u \n", version, MAX17055_DEVICE_ID);
+    LOG("MAX17055 ID: %04X vs %04X \n", version, MAX17055_DEVICE_ID);
 
-    u16 StatusPOR = ReadRegister(MAX17055_STATUS_REG) & 0x0002;
+    if (version != MAX17055_DEVICE_ID) {
+        return;
+    }
 
-    if (StatusPOR==0){
+    u16 StatusPOR = ReadRegister(MAX17055_STATUS_REG);
+    LOG("MAX17055 POR: %04X \n", StatusPOR);
+
+    u16 HibCFG = ReadRegister(MAX17055_HIBCFG_REG); //Store original HibCFG value
+    LOG("MAX17055 HIBCFG: %04X \n", HibCFG);
+
+    if ((StatusPOR & 0x0002)==0){
         goto Step_4_3;
     } //then go to Step 4.3. else { //then do Steps 2–3.}
 
 Step_2:
 
-    while(ReadRegister(MAX17055_FSTAT_REG) & 0x1) {
-        Haptics_WaitUs(10000);
-    } //do not continue until FSTAT.DNR == 0
+    {
+        u16 fstat;
+        while ((fstat = ReadRegister(MAX17055_FSTAT_REG)) & 0x1) {
+            LOG("MAX17055 FSTAT: %04X \n", fstat);
+            Hal_WaitUs(100000);
+        } //do not continue until FSTAT.DNR == 0}
+    }
 
 Step_3:
 
@@ -241,7 +256,7 @@ Step_3:
         }
         //Poll ModelCFG.Refresh(highest bit), proceed to Step 4 when ModelCFG.Refresh = 0.
         while (ReadRegister(MAX17055_MODELCFG_REG) & 0x8000) {
-            Haptics_WaitUs(10000); //10ms wait loop. Do not continue until ModelCFG.Refresh == 0.
+            Hal_WaitUs(10000); //10ms wait loop. Do not continue until ModelCFG.Refresh == 0.
         }
 
         WriteRegister(MAX17055_HIBCFG_REG, HibCFG); // Restore Original HibCFG value

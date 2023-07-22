@@ -20,7 +20,7 @@ int HalI2CWrite(uint8 * buffer, uint16 length);
 
 int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length);
 
-void Haptics_WaitUs(uint16 microSecs);
+void Hal_WaitUs(uint16 microSecs);
 
 void HalGPIOInit(pinID_t pin_id);
 

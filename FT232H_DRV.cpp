@@ -70,7 +70,7 @@ extern "C" int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length) {
     return -status;
 }
 
-extern "C" void Haptics_WaitUs(uint16 microSecs) {
+extern "C" void Hal_WaitUs(uint16 microSecs) {
     std::this_thread::sleep_for(0.1s);
 }
 

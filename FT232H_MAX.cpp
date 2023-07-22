@@ -68,8 +68,8 @@ extern "C" int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length) {
     return -status;
 }
 
-extern "C" void Haptics_WaitUs(uint16 microSecs) {
-    std::this_thread::sleep_for(0.1s);
+extern "C" void Hal_WaitUs(uint16 microSecs) {
+    std::this_thread::sleep_for(std::chrono::microseconds(microSecs));
 }
 
 extern "C" void HalGPIOInit(pinID_t pin_id) {
@@ -180,20 +180,22 @@ FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR
     FT_STATUS status;
     DWORD xfer = 0;
 
-    status = I2C_DeviceWrite(ftHandle, address, 1, &value[0], &xfer,
+    status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
+                             I2C_TRANSFER_OPTIONS_STOP_BIT |
+                             I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
 
-    if (status == FT_OK)
-    {
-        /* Register address not sent on register write. */
-        status = I2C_DeviceWrite(ftHandle, address, length-1, &value[1], &xfer,
-                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
-                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
-                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-        APP_CHECK_STATUS(status);
-    }
+//    if (status == FT_OK)
+//    {
+//        /* Register address not sent on register write. */
+//        status = I2C_DeviceWrite(ftHandle, address, length-1, &value[1], &xfer,
+//                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
+//                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
+//                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+//        APP_CHECK_STATUS(status);
+//    }
 
     return status;
 }
