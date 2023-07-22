@@ -124,6 +124,12 @@ such I2C slaves. */
 /* 3-phase clocking is enabled by default. Setting this bit in ConfigOptions will disable it */
 #define I2C_DISABLE_3PHASE_CLOCKING	0x0001
 
+/* The I2C master should actually drive the SDA line only when the output is LOW. It should be
+tristate the SDA line when the output should be high. This tristating the SDA line during output
+HIGH is supported only in FT232H chip. This feature is called DriveOnlyZero feature and is
+enabled when the following bit is set in the options parameter in function I2C_Init */
+#define I2C_ENABLE_DRIVE_ONLY_ZERO	0x0002
+
 /******************************************************************************/
 /*								Type defines								  */
 /******************************************************************************/
