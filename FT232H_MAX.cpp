@@ -57,18 +57,16 @@ extern "C" void HalI2CInit(uint8 address) {
 extern "C" int HalI2CWrite(uint8 * buffer, uint16 length) {
     FT_STATUS status = i2c_write_multi(ftHandle, m_i2c_address, (PUCHAR)buffer, (UCHAR)length);
     APP_CHECK_STATUS(status);
-    std::this_thread::sleep_for(0.1s);
     return -status;
 }
 
 extern "C" int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length) {
     FT_STATUS status = i2c_read_multi(ftHandle, m_i2c_address, addr, (PUCHAR)buffer, (UCHAR)length);
     APP_CHECK_STATUS(status);
-    std::this_thread::sleep_for(0.1s);
     return -status;
 }
 
-extern "C" void Hal_WaitUs(uint16 microSecs) {
+extern "C" void Hal_WaitUs(uint32 microSecs) {
     std::this_thread::sleep_for(std::chrono::microseconds(microSecs));
 }
 
@@ -89,7 +87,7 @@ int main()
 {
     FT_DEVICE_LIST_INFO_NODE devList;
     FT_STATUS ftStatus;
-    DWORD channels = 0;
+    uint32 channels = 0;
 
     Init_libMPSSE();
 
@@ -101,7 +99,7 @@ int main()
 
     if (channels > 0)
     {
-        for (DWORD i = 0; i < channels; i++)
+        for (uint32 i = 0; i < channels; i++)
         {
             ftStatus = I2C_GetChannelInfo(i, &devList);
             APP_CHECK_STATUS(ftStatus);
@@ -156,10 +154,11 @@ int main()
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
-    DWORD xfer = 0;
+    uint32 xfer = 0;
 
     status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
+                             I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
 
     if (status == FT_OK)
@@ -168,6 +167,7 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
         status = I2C_DeviceRead(ftHandle, address, length, value, &xfer,
                                 I2C_TRANSFER_OPTIONS_START_BIT |
                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
+                                I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                                 I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
     }
     APP_CHECK_STATUS(status);
@@ -178,7 +178,7 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
 FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
-    DWORD xfer = 0;
+    uint32 xfer = 0;
 
     status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
