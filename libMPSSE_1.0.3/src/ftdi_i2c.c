@@ -938,12 +938,12 @@ static FT_STATUS I2C_Read8bitsAndGiveAck(FT_HANDLE handle, uint8 *data, bool ack
 	/* Fix introduced to solve a glitch issue */
 	buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;  
 	buffer[noOfBytes++] = VALUE_SCLLOW_SDALOW ; 
-	buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAIN;                                                                                                      
+	buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAOUT;
 	
 	/* Burn off one I2C bit time */
 	buffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
 	buffer[noOfBytes++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/  
-        buffer[noOfBytes++] = ack ? SEND_ACK : SEND_NACK;/*Only MSB is sent*/
+    buffer[noOfBytes++] = ack ? SEND_ACK : SEND_NACK;/*Only MSB is sent*/
 
 	status = FT_Channel_Write(I2C, handle, noOfBytes, buffer, &noOfBytesTransferred);
 	if (FT_OK != status)
@@ -1304,20 +1304,23 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 		outBuffer[i++] = bitsInThisTransfer - 1;
 
 		/*Command MPSSE to send data to PC immediately */
-		/*buffer[i++] = MPSSE_CMD_SEND_IMMEDIATE;*/
+        outBuffer[i++] = MPSSE_CMD_SEND_IMMEDIATE;
 
 		/* Write 1bit ack after each 8bits read - only in byte mode */
 		if (options & I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES)
 		{
 			outBuffer[i++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
 			outBuffer[i++] = VALUE_SCLLOW_SDALOW ;  
-			outBuffer[i++] = DIRECTION_SCLOUT_SDAIN;
+			outBuffer[i++] = DIRECTION_SCLOUT_SDAOUT;
 
         // Burn off one I2C bit time
-       outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;                                                                      //
-			outBuffer[i++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/ 
-        outBuffer[i++] = (j<(bitsToTransfer-1))?(SEND_ACK):	\
+        outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
+        outBuffer[i++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/
+        uint8 ack = (j<(bitsToTransfer-8))?(SEND_ACK):	\
 			((options & I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE)?SEND_NACK:SEND_ACK);
+        DBG(MSG_DEBUG,"ACK=%u bitsToTransfer=%u bitsInThisTransfer=%u\n",
+            (unsigned)ack, (unsigned)bitsToTransfer, (unsigned)bitsInThisTransfer);
+        outBuffer[i++] = ack;
 		}
 		j+= bitsInThisTransfer;
 	}
