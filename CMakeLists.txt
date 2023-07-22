@@ -20,6 +20,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions(-DFTDIMPSSE_STATIC) # static lib
 #add_definitions(-DINFRA_DEBUG_ENABLE)
 
+#add_subdirectory(./libMPSSE)
 add_subdirectory(./libMPSSE_1.0.3)
 add_subdirectory(./libMAX17055)
 
