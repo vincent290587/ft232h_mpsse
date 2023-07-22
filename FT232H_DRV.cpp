@@ -70,8 +70,8 @@ extern "C" int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length) {
     return -status;
 }
 
-extern "C" void Hal_WaitUs(uint16 microSecs) {
-    std::this_thread::sleep_for(0.1s);
+extern "C" void Hal_WaitUs(uint32 microSecs) {
+    std::this_thread::sleep_for(std::chrono::microseconds(microSecs));
 }
 
 extern "C" void HalGPIOInit(pinID_t pin_id) {
