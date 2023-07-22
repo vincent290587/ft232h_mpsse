@@ -39,23 +39,23 @@
 #define MAX17055_MAX_MIN_REG(mx, mn) ((((int16_t)(mx)) << 8) | ((mn)))
 /* Converts voltages alert range for VALRTTH_REG */
 #define MAX17055_VALRTTH_RESOLUTION 20
-#define MAX17055_VALRTTH_REG(mx, mn)                                           \
+#define MAX17055_VALRTTH_REG_VAL(mx, mn)                                           \
 	MAX17055_MAX_MIN_REG((uint8_t)(mx / MAX17055_VALRTTH_RESOLUTION),      \
 			     (uint8_t)(mn / MAX17055_VALRTTH_RESOLUTION))
 /* Converts temperature alert range for TALRTTH_REG */
-#define MAX17055_TALRTTH_REG(mx, mn)                                           \
+#define MAX17055_TALRTTH_REG_VAL(mx, mn)                                           \
 	MAX17055_MAX_MIN_REG((int8_t)(mx), (int8_t)(mn))
 /* Converts state-of-charge alert range for SALRTTH_REG */
-#define MAX17055_SALRTTH_REG(mx, mn)                                           \
+#define MAX17055_SALRTTH_REG_VAL(mx, mn)                                           \
 	MAX17055_MAX_MIN_REG((uint8_t)(mx), (uint8_t)(mn))
 /* Converts current alert range for IALRTTH_REG */
 /* Current resolution: 0.4mV/RSENSE */
 #define MAX17055_IALRTTH_MUL (10)
 #define MAX17055_IALRTTH_DIV (4)
-#define MAX17055_IALRTTH_REG(mx, mn)                                           \
+#define MAX17055_IALRTTH_REG_VAL(mx, mn)                                           \
 	MAX17055_MAX_MIN_REG(                                                  \
-		(int8_t)(mx * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)),    \
-		(int8_t)(mn * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)))
+		(uint8_t)(mx * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)),    \
+		(uint8_t)(mn * MAX17055_IALRTTH_MUL * BATTERY_MAX17055_RSENSE_MUL / (MAX17055_IALRTTH_DIV * BATTERY_MAX17055_RSENSE_DIV)))
 
 
 enum max17055_register{
@@ -109,6 +109,7 @@ enum max17055_register{
 
     MAX17055_MODELDATA_START_REG        = 0x80,
 
+    MAX17055_STATUS2_REG                = 0xB0,
     MAX17055_IALRTTH_REG                = 0xB4,
     MAX17055_CURVE_REG                  = 0xB9,
     MAX17055_HIBCFG_REG                 = 0xBA,
@@ -127,9 +128,11 @@ int WriteRegister (u8 reg, u16 value) {
     buffer[0] = reg;
 
     buffer[1] = value & 0xFF;
-    buffer[2] = (value >> 8) & 0xFF;
+    buffer[2] = ((value & 0xFF00) >> 8) & 0xFF;
 
     int ret = HalI2CWrite(buffer, sizeof(buffer));
+
+    LOG("Writing 0x%04X to 0x%02X\n", value, reg);
 
     return ret;
 }
@@ -167,22 +170,41 @@ void MAX17055_EnableIAlert(void) {
 
     // Initial Value: 0x2210 for Config, 0x3658 for Config2
 
-    u16 cfg1 = ReadRegister(MAX17055_CONFIG_REG);
-    u16 cfg2 = ReadRegister(MAX17055_CONFIG2_REG);
-    u16 st = ReadRegister(MAX17055_STATUS_REG);
+    WriteRegister(MAX17055_VALRTTH_REG, 0xFF00);
+    WriteRegister(MAX17055_TALRTTH_REG, 0x7F80);
+    WriteRegister(MAX17055_SALRTTH_REG, 0xFF00);
+
+    WriteRegister(MAX17055_CONFIG2_REG, 0x3618);
 
     // Aen: CFG1 D2 (Enable ALRT Pin Output)
     // When Aen = 1, violation if any of the alert threshold register values by
     // temperature, voltage, current, or SOC triggers an alert. This bit affects the ALRT pin operation only
 
-    u16 i_alert_mxmn = MAX17055_IALRTTH_REG(8, 2); // 0.4mV/RSENSE resolution => 40mA with 0.01 ohms => 4mA with 0.1 ohms
-    printf("Setting IAlert to 0x%04X \n", i_alert_mxmn);
+    u16 i_alert_mxmn = MAX17055_IALRTTH_REG_VAL(102, -15); // 0.4mV/RSENSE resolution => 40mA with 0.01 ohms => 4mA with 0.1 ohms
+    LOG("Setting IAlert to 0x%04X \n", i_alert_mxmn);
 
     WriteRegister(MAX17055_IALRTTH_REG, i_alert_mxmn);
 	/* Disable all sticky bits; enable alert AEN */
+    u16 cfg1 = ReadRegister(MAX17055_CONFIG_REG);
     WriteRegister(MAX17055_CONFIG_REG, (cfg1 & ~CONF_ALL_STICKY) | CONF_AEN);
 	/* Clear alerts */
+    u16 st = ReadRegister(MAX17055_STATUS_REG);
     WriteRegister(MAX17055_STATUS_REG, st & ~STATUS_ALL_ALRT);
+}
+
+void MAX17055_PrintTLM(void) {
+
+    u16 st = ReadRegister(MAX17055_STATUS_REG);
+    if (st & STATUS_ALL_ALRT) {
+        LOG("Alerts detected\n");
+        if (st & (STATUS_IMN | STATUS_IMX)) {
+            LOG("Current alert detected\n");
+        }
+        /* Clear alerts */
+        WriteRegister(MAX17055_STATUS_REG, st & ~STATUS_ALL_ALRT);
+    }
+
+
 }
 
 // COMMSH: CFG1 D6 (Communication Shutdown):
@@ -204,6 +226,7 @@ void MAX17055_init(void) {
     u16 dQAcc = (designCap >> 5);
 
     HalI2CInit(0x36);
+    Hal_WaitUs(100000);
 
     u16 version = ReadRegister(MAX17055_VERSION_REG);
     LOG("MAX17055 ID: %04X vs %04X \n", version, MAX17055_DEVICE_ID);
@@ -212,18 +235,22 @@ void MAX17055_init(void) {
         return;
     }
 
-    u16 StatusPOR = ReadRegister(MAX17055_STATUS_REG);
-    LOG("MAX17055 POR: %04X \n", StatusPOR);
+    u16 Status1 = ReadRegister(MAX17055_STATUS_REG);
+    LOG("MAX17055 ST1: %04X \n", Status1);
+
+    u16 Status2 = ReadRegister(MAX17055_STATUS2_REG);
+    LOG("MAX17055 ST2: %04X \n", Status2);
 
     u16 HibCFG = ReadRegister(MAX17055_HIBCFG_REG); //Store original HibCFG value
     LOG("MAX17055 HIBCFG: %04X \n", HibCFG);
 
-    if ((StatusPOR & 0x0002)==0){
+    if ((Status1 & 0x0002)==0){
         goto Step_4_3;
     } //then go to Step 4.3. else { //then do Steps 2–3.}
 
 Step_2:
 
+    LOG("Step_2 \n");
     {
         u16 fstat;
         while ((fstat = ReadRegister(MAX17055_FSTAT_REG)) & 0x1) {
@@ -234,6 +261,7 @@ Step_2:
 
 Step_3:
 
+    LOG("Step_3 \n");
     {
         u16 HibCFG = ReadRegister(MAX17055_HIBCFG_REG); //Store original HibCFG value
         WriteRegister(MAX17055_VFSOC0_QH0_LOCK_REG, 0x90); // Exit Hibernate Mode step 1
@@ -265,6 +293,7 @@ Step_3:
 
 Step_4_0:
 
+    LOG("Step_4_0 \n");
     {
         u16 Status = ReadRegister(MAX17055_STATUS_REG); //Read Status
         WriteAndVerifyRegister(MAX17055_STATUS_REG, Status & 0xFFFD); //Write and Verify Status with POR bit cleared
@@ -275,10 +304,14 @@ Step_4_0:
 
 Step_4_3:
 
+    LOG("Step_4_3 \n");
     {
         u16 RepCap = ReadRegister(MAX17055_REPCAP_REG); //Read RepCap
+        LOG("MAX17055 REPCAP: %04X \n", RepCap);
         u16 RepSOC = ReadRegister(MAX17055_REPSOC_REG); //Read RepSOC
+        LOG("MAX17055 REPSOC: %04X \n", RepSOC);
         u16 TTE = ReadRegister(MAX17055_TTE_REG) ; //Read TTE
+        LOG("MAX17055 TTE: %04X \n", TTE);
      }
 
 }

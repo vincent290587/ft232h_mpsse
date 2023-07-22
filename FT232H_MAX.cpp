@@ -87,7 +87,7 @@ int main()
 {
     FT_DEVICE_LIST_INFO_NODE devList;
     FT_STATUS ftStatus;
-    uint32 channels = 0;
+    DWORD channels = 0;
 
     Init_libMPSSE();
 
@@ -125,7 +125,7 @@ int main()
         ChannelConfig channelConf;
         channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
         channelConf.LatencyTimer = 2;
-        channelConf.Options = 0;
+        channelConf.Options = I2C_ENABLE_DRIVE_ONLY_ZERO;
 
         ftStatus = I2C_InitChannel(ftHandle, &channelConf);
         APP_CHECK_STATUS(ftStatus);
@@ -135,9 +135,23 @@ int main()
     }
 
     {
+        FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 0, 0);
+        APP_CHECK_STATUS(ftStatus);
+
         MAX17055_init();
 
         MAX17055_EnableIAlert();
+
+        for (int i = 0; i < 400; i++) {
+
+            MAX17055_PrintTLM();
+
+            uint8 gpio_value;
+            FT_STATUS result = FT_ReadGPIO(ftHandle, &gpio_value);
+            LOG("GPIO value: %02X \n", result);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
     }
 
     ftStatus = I2C_CloseChannel(ftHandle);
@@ -154,7 +168,7 @@ int main()
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
-    uint32 xfer = 0;
+    DWORD xfer = 0;
 
     status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
@@ -178,7 +192,7 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
 FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
-    uint32 xfer = 0;
+    DWORD xfer = 0;
 
     status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |

@@ -17,6 +17,8 @@ void MAX17055_init(void);
 
 void MAX17055_EnableIAlert(void);
 
+void MAX17055_PrintTLM(void);
+
 #ifdef __cplusplus
 }
 #endif
