@@ -43,6 +43,8 @@ using namespace std;
 
 static FT_HANDLE ftHandle;
 static UCHAR m_i2c_address;
+static UCHAR m_gpio_conf = 0x00; // all input
+static UCHAR m_gpio_val  = 0x00; // all low
 
 FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value);
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length);
@@ -74,13 +76,28 @@ extern "C" void Hal_WaitUs(uint32 microSecs) {
     std::this_thread::sleep_for(std::chrono::microseconds(microSecs));
 }
 
-extern "C" void HalGPIOInit(pinID_t pin_id) {
-    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 1 << pin_id, 0);
+extern "C" void HalGPIOInitIn(pinID_t pin_id) {
+    m_gpio_conf &= ~(1 << pin_id);
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
+    APP_CHECK_STATUS(ftStatus);
+}
+
+extern "C" void HalGPIOInitOut(pinID_t pin_id) {
+    m_gpio_conf |= 1 << pin_id;
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
     APP_CHECK_STATUS(ftStatus);
 }
 
 extern "C" void HalGPIOset(pinID_t pin_id, uint8 value) {
-    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 1 << pin_id, value << pin_id);
+    if (value) {
+        // set it
+        m_gpio_val |= 1 << pin_id;
+    } else {
+        // clear it
+        m_gpio_val &= ~(1 << pin_id);
+    }
+    LOG("FT_WriteGPIO %02X %02X \n", m_gpio_conf, m_gpio_val);
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
     APP_CHECK_STATUS(ftStatus);
 }
 
