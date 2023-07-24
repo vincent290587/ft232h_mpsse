@@ -49,6 +49,8 @@ FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR
 /////////////////////////////////////////////////////////////////////////////////////
 
 static UCHAR m_i2c_address = 0x36;
+static UCHAR m_gpio_conf = 0x00; // all input
+static UCHAR m_gpio_val  = 0x00; // all low
 
 extern "C" void HalI2CInit(uint8 address) {
     m_i2c_address = address;
@@ -70,13 +72,28 @@ extern "C" void Hal_WaitUs(uint32 microSecs) {
     std::this_thread::sleep_for(std::chrono::microseconds(microSecs));
 }
 
-extern "C" void HalGPIOInit(pinID_t pin_id) {
-    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 1 << pin_id, 0);
+extern "C" void HalGPIOInitIn(pinID_t pin_id) {
+    m_gpio_conf &= ~(1 << pin_id);
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
+    APP_CHECK_STATUS(ftStatus);
+}
+
+extern "C" void HalGPIOInitOut(pinID_t pin_id) {
+    m_gpio_conf |= 1 << pin_id;
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
     APP_CHECK_STATUS(ftStatus);
 }
 
 extern "C" void HalGPIOset(pinID_t pin_id, uint8 value) {
-    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 1 << pin_id, value << pin_id);
+    if (value) {
+        // set it
+        m_gpio_val |= 1 << pin_id;
+    } else {
+        // clear it
+        m_gpio_val &= ~(1 << pin_id);
+    }
+    LOG("FT_WriteGPIO %02X %02X \n", m_gpio_conf, m_gpio_val);
+    FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, m_gpio_conf, m_gpio_val);
     APP_CHECK_STATUS(ftStatus);
 }
 
@@ -135,20 +152,25 @@ int main()
     }
 
     {
-        FT_STATUS ftStatus = FT_WriteGPIO(ftHandle, 0, 0);
-        APP_CHECK_STATUS(ftStatus);
+        HalGPIOInitIn(0);
+
+//        HalGPIOInitOut(1);
 
         MAX17055_init();
 
         MAX17055_EnableIAlert();
 
-        for (int i = 0; i < 400; i++) {
+        for (unsigned i = 0; i < 400; i++) {
 
             MAX17055_PrintTLM();
 
-            uint8 gpio_value;
-            FT_STATUS result = FT_ReadGPIO(ftHandle, &gpio_value);
-            LOG("GPIO value: %02X \n", result);
+//            HalGPIOset(1, i & 0b1);
+
+            uint8 value[1];
+            FT_STATUS ftStatus = FT_ReadGPIO(ftHandle, value);
+            APP_CHECK_STATUS(ftStatus);
+
+            LOG("value: %02X \n", value[0]);
 
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }

@@ -22,7 +22,9 @@ int HalSensorReadReg(uint8 addr, uint8 * buffer, uint16 length);
 
 void Hal_WaitUs(uint32 microSecs);
 
-void HalGPIOInit(pinID_t pin_id);
+void HalGPIOInitIn(pinID_t pin_id);
+
+void HalGPIOInitOut(pinID_t pin_id);
 
 void HalGPIOset(pinID_t pin_id, uint8 value);
 
