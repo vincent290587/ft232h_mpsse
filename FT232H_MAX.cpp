@@ -223,16 +223,6 @@ FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
 
-//    if (status == FT_OK)
-//    {
-//        /* Register address not sent on register write. */
-//        status = I2C_DeviceWrite(ftHandle, address, length-1, &value[1], &xfer,
-//                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
-//                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
-//                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//        APP_CHECK_STATUS(status);
-//    }
-
     return status;
 }
 

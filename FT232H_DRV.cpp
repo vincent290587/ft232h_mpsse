@@ -210,7 +210,7 @@ int main()
         ChannelConfig channelConf;
         channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
         channelConf.LatencyTimer = 2;
-        channelConf.Options = 0;
+        channelConf.Options = I2C_ENABLE_DRIVE_ONLY_ZERO;
 
         ftStatus = I2C_InitChannel(ftHandle, &channelConf);
         APP_CHECK_STATUS(ftStatus);
@@ -234,29 +234,6 @@ int main()
     return 0;
 }
 
-//FT_STATUS i2c_read(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value)
-//{
-//    FT_STATUS status;
-//    DWORD xfer = 0;
-//
-//    /* As per Bosch BME280 Datasheet Figure 9: I2C Multiple Byte Read. */
-//    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
-//                             I2C_TRANSFER_OPTIONS_START_BIT |
-//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//
-//    if (status == FT_OK)
-//    {
-//        /* Repeated Start condition generated. */
-//        status = I2C_DeviceRead(ftHandle, address, 1, value, &xfer,
-//                                I2C_TRANSFER_OPTIONS_START_BIT |
-//                                I2C_TRANSFER_OPTIONS_STOP_BIT |
-//                                I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-//    }
-//    APP_CHECK_STATUS(status);
-//
-//    return status;
-//}
-
 FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
@@ -264,6 +241,7 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
 
     status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
+                             I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
 
     if (status == FT_OK)
@@ -272,6 +250,7 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
         status = I2C_DeviceRead(ftHandle, address, length, value, &xfer,
                                 I2C_TRANSFER_OPTIONS_START_BIT |
                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
+                                I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                                 I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
     }
     APP_CHECK_STATUS(status);
@@ -279,71 +258,17 @@ FT_STATUS i2c_read_multi(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, PUCHAR va
     return status;
 }
 
-//FT_STATUS i2c_write(FT_HANDLE ftHandle, UCHAR address, UCHAR value)
-//{
-//    FT_STATUS status;
-//    DWORD xfer = 0;
-//
-//    status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
-//                             I2C_TRANSFER_OPTIONS_START_BIT |
-//                             I2C_TRANSFER_OPTIONS_STOP_BIT |
-//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//    APP_CHECK_STATUS(status);
-//
-//    return status;
-//}
-
 FT_STATUS i2c_write_multi(FT_HANDLE ftHandle, UCHAR address, PUCHAR value, UCHAR length)
 {
     FT_STATUS status;
     DWORD xfer = 0;
 
-#if 0
     status = I2C_DeviceWrite(ftHandle, address, length, value, &xfer,
                              I2C_TRANSFER_OPTIONS_START_BIT |
                              I2C_TRANSFER_OPTIONS_STOP_BIT |
-                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-    APP_CHECK_STATUS(status);
-#else
-//    printf();
-
-    status = I2C_DeviceWrite(ftHandle, address, 1, &value[0], &xfer,
-                             I2C_TRANSFER_OPTIONS_START_BIT |
+                             I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES |
                              I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
     APP_CHECK_STATUS(status);
 
-    if (status == FT_OK)
-    {
-        /* Register address not sent on register write. */
-        status = I2C_DeviceWrite(ftHandle, address, length-1, &value[1], &xfer,
-                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
-                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
-                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-        APP_CHECK_STATUS(status);
-    }
-#endif
     return status;
 }
-
-//FT_STATUS i2c_write_reg(FT_HANDLE ftHandle, UCHAR address, UCHAR reg, UCHAR value)
-//{
-//    FT_STATUS status;
-//    DWORD xfer = 0;
-//
-//    status = I2C_DeviceWrite(ftHandle, address, 1, &reg, &xfer,
-//                             I2C_TRANSFER_OPTIONS_START_BIT |
-//                             I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//    APP_CHECK_STATUS(status);
-//
-//    if (status == FT_OK)
-//    {
-//        /* Register address not sent on register write. */
-//        status = I2C_DeviceWrite(ftHandle, address, 1, &value, &xfer,
-//                                 I2C_TRANSFER_OPTIONS_NO_ADDRESS |
-//                                 I2C_TRANSFER_OPTIONS_STOP_BIT |
-//                                 I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
-//        APP_CHECK_STATUS(status);
-//    }
-//
-//    return status;
-//}
