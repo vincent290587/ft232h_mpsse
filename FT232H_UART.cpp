@@ -18,11 +18,15 @@ static inline int _send_receive(struct sp_port *tx_port, struct sp_port *rx_port
 
     /* We'll allow a 1 second timeout for send and receive. */
     unsigned int timeout = 200;
+    uint8_t buf[128];
+    memset(buf, 0xFF, sizeof(buf));
+
+    // drain buffers
+    (void)sp_nonblocking_read(rx_port, buf, sizeof(buf));
 
     int result = sp_nonblocking_write(tx_port, data, size);
     APP_CHECK_STATUS(result != size);
 
-    uint8_t buf[128];
     /* Try to receive the data on the other port. */
     result = sp_blocking_read(rx_port, buf, size, timeout);
     APP_CHECK_STATUS(result != size);
@@ -147,7 +151,19 @@ int main(int argc, char **argv)
     std::this_thread::sleep_for(0.1s);
 
     {
-        const uint8_t data[] = {0x16, 0x0B, 0x03, 0x24};
+        const uint8_t data[] = {0x16, 0x0B, 0x03, 0x24}; // PAS1
+        _send_receive(tx_port, rx_port, data, sizeof(data));
+    }
+
+    std::this_thread::sleep_for(0.1s);
+
+    {
+        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2};
+        _send_receive(tx_port, rx_port, data, sizeof(data));
+    }
+
+    {
+        const uint8_t data[] = {0x16, 0x0B, 0x02, 0x23}; // PAS2
         _send_receive(tx_port, rx_port, data, sizeof(data));
     }
 
