@@ -45,6 +45,10 @@ add_executable(${PROJECT_NAME}_lsm
         FT232H_LSM6.cpp
 )
 
+add_executable(${PROJECT_NAME}_uart
+        FT232H_UART.cpp
+)
+
 target_include_directories(libDRV2605 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(${PROJECT_NAME}_gpio FTDI_MPSSE_Lib libDRV2605)
@@ -52,5 +56,6 @@ target_link_libraries(${PROJECT_NAME}_drv2605 FTDI_MPSSE_Lib libDRV2605)
 target_link_libraries(${PROJECT_NAME}_bme280 FTDI_MPSSE_Lib libDRV2605)
 target_link_libraries(${PROJECT_NAME}_max FTDI_MPSSE_Lib libMAX17055)
 target_link_libraries(${PROJECT_NAME}_lsm FTDI_MPSSE_Lib libLSM6DS3TR)
+target_link_libraries(${PROJECT_NAME}_uart serialport)
 
 file( GENERATE OUTPUT "${CMAKE_BINARY_DIR}/.gitignore" CONTENT "*" )

@@ -26,6 +26,8 @@ int main()
     FT_STATUS ftStatus;
     DWORD channels = 0;
 
+    std::cout.setf(std::ios::unitbuf);
+
     Init_libMPSSE();
 
     {
