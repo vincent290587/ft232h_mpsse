@@ -151,14 +151,14 @@ int main(int argc, char **argv)
     std::this_thread::sleep_for(0.1s);
 
     {
-        const uint8_t data[] = {0x16, 0x0B, 0x03, 0x24}; // PAS1
+        const uint8_t data[] = {0x16, 0x0B, 0x0C, 0x2D}; // PAS1
         _send_receive(tx_port, rx_port, data, sizeof(data));
     }
 
     std::this_thread::sleep_for(0.1s);
 
     {
-        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2};
+        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2}; // RPM
         _send_receive(tx_port, rx_port, data, sizeof(data));
     }
 
@@ -170,7 +170,21 @@ int main(int argc, char **argv)
     std::this_thread::sleep_for(0.1s);
 
     {
-        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2};
+        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2}; // RPM
+        _send_receive(tx_port, rx_port, data, sizeof(data));
+    }
+
+    std::this_thread::sleep_for(0.1s);
+
+    {
+        const uint8_t data[] = {0x16, 0x0B, 0x03, 0x24}; // PAS3
+        _send_receive(tx_port, rx_port, data, sizeof(data));
+    }
+
+    std::this_thread::sleep_for(0.1s);
+
+    {
+        const uint8_t data[] = { 0x16 , 0x1F , 0x00 , 0xBD , 0xF2}; // RPM
         _send_receive(tx_port, rx_port, data, sizeof(data));
     }
 
