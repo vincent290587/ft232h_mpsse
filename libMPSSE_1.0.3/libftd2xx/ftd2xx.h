@@ -27,7 +27,7 @@ ftd2xx.h
 
 Abstract:
 
-Native USB device driver for FTDI FT232x, FT245x, FT2232x and FT4232x devices
+Native USB device driver for FTDI FT232x, FT245x, FT2232x, FT4232x, FT2233H and FT4233H devices
 FTD2XX library definitions
 
 Environment:
@@ -2478,7 +2478,7 @@ extern "C" {
 /** @} */
 
 /** @name Extended API Functions
- * The extended API functions do not apply to FT8U232AM or FT8U245AM devices. FTDI’s other USB-UART
+ * The extended API functions do not apply to FT8U232AM or FT8U245AM devices. FTDIâ€™s other USB-UART
  * and USB-FIFO ICs (the FT2232H, FT4232H, FT232R, FT245R, FT2232, FT232B and FT245B) do support
  * these functions. Note that there is device dependence in some of these functions.
  */
@@ -2660,8 +2660,8 @@ extern "C" {
 	 * @param dwCreate This parameter must be set to OPEN_EXISTING. Ignored in Linux.
 	 * @param dwAttrsAndFlags File attributes and flags. This parameter is a combination of
 	 * FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OVERLAPPED if overlapped I/O is used,
-	 * FT_OPEN_BY_SERIAL_NUMBER if lpszName is the device’s serial number, and
-	 * FT_OPEN_BY_DESCRIPTION if lpszName is the device’s description.
+	 * FT_OPEN_BY_SERIAL_NUMBER if lpszName is the deviceâ€™s serial number, and
+	 * FT_OPEN_BY_DESCRIPTION if lpszName is the deviceâ€™s description.
 	 * @param hTemplate This parameter must be NULL.
 	 * @returns
 	 * If the function is successful, the return value is a handle.

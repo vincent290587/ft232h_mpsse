@@ -262,6 +262,17 @@ FTDIMPSSE_API FT_STATUS SPI_InitChannel(FT_HANDLE handle, ChannelConfig *config)
 	config->Pin |= \
 		((1<<((config->configOptions & SPI_CONFIG_OPTION_CS_MASK)>>2))<<3);
 
+	if(config->configOptions & SPI_CONFIG_OPTION_CS_ACTIVELOW)
+	{
+		config->Pin |= \
+			((1<<((config->configOptions & SPI_CONFIG_OPTION_CS_MASK)>>2))<<11);
+	}
+	else
+	{
+		config->Pin &= \
+			~((1<<((config->configOptions & SPI_CONFIG_OPTION_CS_MASK)>>2))<<11);
+	}
+
 	/*Set initial state of clock line*/
 	mode = (config->configOptions & SPI_CONFIG_OPTION_MODE_MASK);
 	switch(mode)

@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110321
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright Â© 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -307,23 +307,20 @@ FT_STATUS FT_OpenChannel(FT_LegacyProtocol Protocol, DWORD index,
  * \note
  * \warning
  */
-FT_STATUS FT_InitChannel(FT_LegacyProtocol Protocol, FT_HANDLE handle,...)
+FT_STATUS FT_InitChannel(
+	FT_LegacyProtocol Protocol, 
+	FT_HANDLE handle,
+	uint32 clockRate, 
+	uint32 latencyTimer, 
+	uint32 configOptions,
+	DWORD Pin)
 {
-	va_list argumentList;
-	uint32	clockRate, latencyTimer, configOptions;
 	FT_STATUS status;
 	FT_DEVICE ftDevice;
 
 	FN_ENTER;
 
-	/*initialise the argument list*/
-	va_start(argumentList, handle);
-	/*Get the value for Clockrate*/
-	clockRate = va_arg(argumentList, uint32);
-	/*latencyTimer*/
-	latencyTimer = va_arg(argumentList, uint32);
-	/* The options parameter passed in I2C_Init, SPI_Init */
-	configOptions = va_arg(argumentList, uint32);
+
 	/*Check parameters*/
 	if ((clockRate < MIN_CLOCK_RATE) 
 		|| (clockRate > MAX_CLOCK_RATE) 
@@ -354,9 +351,13 @@ FT_STATUS FT_InitChannel(FT_LegacyProtocol Protocol, FT_HANDLE handle,...)
 	/*SetLatencyTimer*/
 	status = Mid_SetLatencyTimer(handle,(UCHAR)latencyTimer);
 	CHECK_STATUS(status);
-	/*ResetMPSSE*/
-	status = Mid_ResetMPSSE(handle);
-	CHECK_STATUS(status);
+
+	if (!(Pin&0xFF))
+	{
+		/*ResetMPSSE*/
+		status = Mid_ResetMPSSE(handle);
+		CHECK_STATUS(status);
+	}
 	/*EnableMPSSEInterface*/
 	status = Mid_EnableMPSSEIn(handle);
 	CHECK_STATUS(status);
@@ -385,11 +386,21 @@ FT_STATUS FT_InitChannel(FT_LegacyProtocol Protocol, FT_HANDLE handle,...)
 	{
 		case I2C:
 		{
-			/*Set i/o pin states*/
-			status = Mid_SetGPIOLow(handle, MID_SET_LOW_BYTE_DATA_BITS_DATA,
-				MID_SET_LOW_BYTE_DATA_BITS_DATA);
-			CHECK_STATUS(status);
-
+			if(configOptions & I2C_ENABLE_PIN_STATE_CONFIG)
+			{
+				/*Set i/o pin states*/
+				status = Mid_SetGPIOLow(handle, 
+				(Pin&0xFF00) >> 8, /* VALUE */
+					Pin & 0xFF);  /* DIRECTION */
+				CHECK_STATUS(status);
+			}
+			else
+			{
+				/*Set i/o pin states*/
+				status = Mid_SetGPIOLow(handle, MID_SET_LOW_BYTE_DATA_BITS_DATA,
+					MID_SET_LOW_BYTE_DATA_BITS_DATA);
+				CHECK_STATUS(status);
+			}
 			/* The I2C master should actually drive the SDA line only when the output is LOW.
 			It should tristate the SDA line when the output should be high. This tristating
 			the SDA line during output HIGH is supported only in FT232H chip*/
@@ -1046,11 +1057,26 @@ FT_STATUS Mid_SetClock(FT_HANDLE handle, FT_DEVICE ftDevice, uint32 clock)
 		case FT_DEVICE_2232H:
 		case FT_DEVICE_4232H:
 		case FT_DEVICE_232H:
-			DBG(MSG_DEBUG,"handle = 0x%x value = 0x%x DISABLE_CLOCK_DIVIDE\n", (unsigned)handle,(unsigned)value);
-			value = DISABLE_CLOCK_DIVIDE;
-			status = varFunctionPtrLst.p_FT_Write(handle,&value, 1, &bytesWritten);
-			CHECK_STATUS(status);
-			value = (MID_30MHZ/clock) - 1;
+			if(clock <= MID_6MHZ)
+			{
+				DBG(MSG_DEBUG,"handle=0x%x value=0x%x ENABLE_CLOCK_DIVIDE\n",\
+					(unsigned)handle,(unsigned)value);
+				value = ENABLE_CLOCK_DIVIDE;
+				status = varFunctionPtrLst.p_FT_Write(handle,&value,1,\
+					&bytesWritten);
+				CHECK_STATUS(status);
+				value = (MID_6MHZ/clock) - 1;
+			}
+			else
+			{
+				DBG(MSG_DEBUG,"handle=0x%x value=0x%x DISABLE_CLOCK_DIVIDE\n",\
+					(unsigned)handle,(unsigned)value);
+				value = DISABLE_CLOCK_DIVIDE;
+				status = varFunctionPtrLst.p_FT_Write(handle,&value,1,\
+					&bytesWritten);
+				CHECK_STATUS(status);
+				value = (MID_30MHZ/clock) - 1;
+			}
 			break;
 	}
 	/*calculate valueH and ValueL*/

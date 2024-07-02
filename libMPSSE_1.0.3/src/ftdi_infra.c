@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110317
  *
- * Copyright ï¿½ 2000-2014 Future Technology Devices International Limited
+ * Copyright © 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -30,7 +30,7 @@
 /******************************************************************************/
 #define FTDI_EXPORTS
 #include "ftdi_infra.h"		/*portable infrastructure(datatypes, libraries, etc)*/
-#include "ftdi_common.h"
+
 
 /******************************************************************************/
 /*								Macro defines					  			  */
@@ -237,7 +237,7 @@ FTDIMPSSE_API void Init_libMPSSE(void)
 		fprintf(stderr, "dlopen failed: %s\n", dlerror()); 
 	}
 #else // _WIN32
-	hdll_d2xx = LoadLibrary("ftd2xx.dll");
+	hdll_d2xx = LoadLibrary(L"ftd2xx.dll");
 #endif // _WIN32
 
 	CHECK_NULL(hdll_d2xx);

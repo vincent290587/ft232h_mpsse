@@ -188,7 +188,9 @@ typedef signed char   int8;
 typedef signed short  int16;
 typedef signed long long int64;
 
-typedef BOOL	bool;
+#ifndef __cplusplus   // bool is defined already in C++
+  typedef BOOL	bool; // bool is defined already in C++
+#endif                // bool is defined already in C++
 
 typedef unsigned int   uint32;
 typedef signed int   int32;

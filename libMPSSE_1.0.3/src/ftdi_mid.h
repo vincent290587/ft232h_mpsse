@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110323
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright Â© 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -84,7 +84,16 @@ FT_STATUS FT_GetChannelInfo(FT_LegacyProtocol Protocol, DWORD index,
 			FT_DEVICE_LIST_INFO_NODE *chanInfo);
 FT_STATUS FT_OpenChannel(FT_LegacyProtocol Protocol, DWORD index,
 			FT_HANDLE *handle);
-FT_STATUS FT_InitChannel(FT_LegacyProtocol Protocol, FT_HANDLE handle,...);
+
+
+FT_STATUS FT_InitChannel(		
+	FT_LegacyProtocol Protocol,	
+	FT_HANDLE handle,			
+	uint32 clockRate,			
+	uint32 latencyTimer,		
+	uint32 configOptions,		
+	DWORD Pin);					
+
 FT_STATUS FT_CloseChannel(FT_LegacyProtocol Protocol, FT_HANDLE handle);
 FT_STATUS FT_Channel_Read(FT_LegacyProtocol Protocol, FT_HANDLE handle,
 				DWORD noOfBytes, uint8* buffer, LPDWORD noOfBytesTransferred);

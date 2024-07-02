@@ -38,7 +38,7 @@
 #define FT_VER_MINOR		0
 #endif // FT_VER_MINOR
 #ifndef FT_VER_BUILD
-#define FT_VER_BUILD		1
+#define FT_VER_BUILD		5
 #endif // FT_VER_BUILD
 
 /******************************************************************************/
@@ -120,6 +120,9 @@ output is supported only in FT232H chip. This feature is called DriveOnlyZero fe
 enabled when the following bit is set in the options parameter in function I2C_Init */
 #define I2C_ENABLE_DRIVE_ONLY_ZERO	0x0002
 
+#ifndef I2C_ENABLE_PIN_STATE_CONFIG
+#define I2C_ENABLE_PIN_STATE_CONFIG 0x0010
+#endif
 
 
 /******************************************************************************/

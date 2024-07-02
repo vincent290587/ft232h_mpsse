@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # Set the project name
-project(FTDI_MPSSE_Lib)
+project(FTDI_MPSSE_Lib VERSION 1.0.5)
 
 # Set our include directories
 include_directories(

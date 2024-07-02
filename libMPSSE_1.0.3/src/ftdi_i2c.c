@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110321
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright Â© 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -32,6 +32,8 @@
 /******************************************************************************/
 /*								Include files					  			  */
 /******************************************************************************/
+#include <assert.h>			
+
 #define FTDI_EXPORTS
 #include "ftdi_infra.h"		/*Common portable infrastructure(datatypes, libraries, etc)*/
 #include "ftdi_common.h"	/*Common across I2C, SPI, JTAG modules*/
@@ -93,6 +95,36 @@ typedef enum I2C_Bus_Condition_t{
 /******************************************************************************/
 /*								Local function declarations					  */
 /******************************************************************************/
+/* List management functions */
+
+/*!
+ * \brief Allocates storage in the system to store channel configuration data
+ *
+ * This function adds a link in a linked list to store channel configuration
+ * information when they are passed by the user in I2C_OpenChannel.
+ *
+ * \param[in] handle Handle of the channel
+ * \return Returns status code of type FT_STATUS(see D2XX Programmer's Guide)
+ * \sa
+ * \note This function should be called after a channel has been successfully
+ *	     opened and a handle to it has been assigned
+ * \warning
+ */
+static FT_STATUS I2C_AddChannelConfig(FT_HANDLE handle);
+
+/*!
+ * \brief Deletes storage allocated for channel configuration data
+ *
+ * This function traverses the channel configuration data linked list,
+ * finds the channel with the given handle and then deletes it
+ *
+ * \param[in] handle Handle of the channel
+ * \return Returns status code of type FT_STATUS(see D2XX Programmer's Guide)
+ * \sa
+ * \note
+ * \warning
+ */
+static FT_STATUS I2C_DelChannelConfig(FT_HANDLE handle);
 
 #ifdef I2C_CMD_GETDEVICEID_SUPPORTED
 /*!
@@ -170,7 +202,7 @@ static FT_STATUS I2C_WriteDeviceAddress(FT_HANDLE handle, UCHAR deviceAddress,
  */
 static FT_STATUS I2C_SaveChannelConfig(FT_HANDLE handle, ChannelConfig *config);
 
-#ifdef I2C_CMD_GETDEVICEID_SUPPORTED
+// #ifdef I2C_CMD_GETDEVICEID_SUPPORTED
 /*!
  * \brief Retrieves channel's configuration data
  *
@@ -183,8 +215,8 @@ static FT_STATUS I2C_SaveChannelConfig(FT_HANDLE handle, ChannelConfig *config);
  * \note
  * \warning
  */
-static FT_STATUS I2C_GetChannelConfig(FT_HANDLE handle, ChannelConfig *config);
-#endif // I2C_CMD_GETDEVICEID_SUPPORTED
+static FT_STATUS I2C_GetChannelConfig(FT_HANDLE handle, ChannelConfig **config);
+// #endif // I2C_CMD_GETDEVICEID_SUPPORTED
 
 /*!
  * \brief Generates the I2C Start condition
@@ -292,6 +324,14 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 /*								Global variables							  */
 /******************************************************************************/
 
+#ifdef NO_LINKED_LIST
+	ChannelContext channelContext;
+#else
+/*Root of the linked list that holds channel configurations*/
+	ChannelContext *gListHead  = NULL;
+#endif
+
+
 #ifdef I2C_CMD_GETDEVICEID_SUPPORTED
 /*!
  * \brief I2C bus condition timings table
@@ -344,6 +384,7 @@ FTDIMPSSE_API FT_STATUS I2C_GetChannelInfo(DWORD index,
 #ifdef ENABLE_PARAMETER_CHECKING
 	CHECK_NULL_RET(chanInfo);
 #endif // ENABLE_PARAMETER_CHECKING
+	// Channel start with 1 (index start with 0) channel = index+1
 	status = FT_GetChannelInfo(I2C, index+1, chanInfo);
 	CHECK_STATUS(status);
 	FN_EXIT;
@@ -362,6 +403,11 @@ FTDIMPSSE_API FT_STATUS I2C_OpenChannel(DWORD index, FT_HANDLE *handle)
 	status = FT_OpenChannel(I2C, index+1, handle);
 	DBG(MSG_DEBUG,"index=%u handle=%u\n",(unsigned)index,(unsigned)*handle);
 	CHECK_STATUS(status);
+	if (FT_OK == status)
+	{
+		status = I2C_AddChannelConfig(*handle);
+		CHECK_STATUS(status);
+	}
 	FN_EXIT;
 	return status;
 }
@@ -372,6 +418,7 @@ FTDIMPSSE_API FT_STATUS I2C_InitChannel(FT_HANDLE handle, ChannelConfig *config)
 	uint8 buffer[3];//3
 	uint32 noOfBytesToTransfer;
 	DWORD noOfBytesTransferred;
+	DWORD Pin = 0;
 	FN_ENTER;
 #ifdef ENABLE_PARAMETER_CHECKING
 	CHECK_NULL_RET(config);
@@ -381,11 +428,21 @@ FTDIMPSSE_API FT_STATUS I2C_InitChannel(FT_HANDLE handle, ChannelConfig *config)
 	{/* Adjust clock rate if 3phase clocking should be enabled */
 		config->ClockRate = (config->ClockRate * 3)/2;
 	}
+	if(config->Options & I2C_ENABLE_PIN_STATE_CONFIG)
+	{
+		Pin = config->Pin;
+	}
 	DBG(MSG_DEBUG,"handle = 0x%x ClockRate=%u LatencyTimer=%u Options = 0x%x\n",
 		(unsigned)handle, (unsigned)config->ClockRate,
 		(unsigned)config->LatencyTimer,(unsigned)config->Options);
-	status = FT_InitChannel(I2C, handle, (uint32)config->ClockRate,
-		(uint32)config->LatencyTimer,(uint32)config->Options);
+	
+	status = FT_InitChannel(I2C,
+		handle, 
+		(uint32)config->ClockRate,
+		(uint32)config->LatencyTimer,
+		(uint32)config->Options,
+		Pin);
+	
 	CHECK_STATUS(status);
 
 	if (!(config->Options & I2C_DISABLE_3PHASE_CLOCKING))
@@ -400,7 +457,11 @@ FTDIMPSSE_API FT_STATUS I2C_InitChannel(FT_HANDLE handle, ChannelConfig *config)
 	}
 
 	/*Save the channel's config data for later use*/
-	status = I2C_SaveChannelConfig(handle, config);
+	if (FT_OK == status)
+	{
+		DBG(MSG_DEBUG,"line %u handle = 0x%x\n", __LINE__,(unsigned)handle);
+		status = I2C_SaveChannelConfig(handle, config);
+	}
 	CHECK_STATUS(status);
 	FN_EXIT;
 	return status;
@@ -409,12 +470,41 @@ FTDIMPSSE_API FT_STATUS I2C_InitChannel(FT_HANDLE handle, ChannelConfig *config)
 FTDIMPSSE_API FT_STATUS I2C_CloseChannel(FT_HANDLE handle)
 {
 	FT_STATUS status;
+	ChannelConfig *config = NULL;
+	UCHAR dir, val;
+	UCHAR buffer[5];
+	DWORD noOfBytes = 0;
+	DWORD noOfBytesTransferred;
+	
 	FN_ENTER;
 #ifdef ENABLE_PARAMETER_CHECKING
 		CHECK_NULL_RET(handle);
 #endif // ENABLE_PARAMETER_CHECKING
+
+	/* Retrieve final state values for the lines */
+	status = I2C_GetChannelConfig(handle, &config);
+	CHECK_STATUS(status);
+	if(config)
+	{
+		dir = (UCHAR)((config->Pin & 0x00FF0000)>>16);
+		val = (UCHAR)((config->Pin & 0xFF000000)>>24);
+
+		/* Set lines to final state */
+		buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;/* MPSSE command */
+		buffer[noOfBytes++] = val; /*Value*/
+		buffer[noOfBytes++] = dir; /*Direction*/
+		status = FT_Channel_Write(I2C, handle, noOfBytes, buffer,\
+			&noOfBytesTransferred);
+		CHECK_STATUS(status);
+	}
+	
 	status = FT_CloseChannel(I2C, handle);
 	CHECK_STATUS(status);
+	if (FT_OK == status)
+	{
+		status = I2C_DelChannelConfig(handle);
+		CHECK_STATUS(status);
+	}
 	FN_EXIT;
 	return status;
 }
@@ -931,19 +1021,39 @@ static FT_STATUS I2C_Read8bitsAndGiveAck(FT_HANDLE handle, uint8 *data, bool ack
 	/*Command to read 8 bits*/
 	buffer[noOfBytes++] = MPSSE_CMD_DATA_IN_BITS_POS_EDGE;
 	buffer[noOfBytes++] = DATA_SIZE_8BITS;/*0x00 = 1bit; 0x07 = 8bits*/
+/* Set directions to make SDA drive out. Pre-set state of SDA first though to avoid glitch */
+	if (ack)
+	{
+		/* We will drive the ACK bit to a '0' so pre-set pin to a '0' */
+		buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
+		buffer[noOfBytes++] = VALUE_SCLLOW_SDALOW;
+		buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAOUT;
 
-	/*Command MPSSE to send data to PC immediately */
+		/* Clock out the ack bit as a '0' on negative edge */
+		buffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
+		buffer[noOfBytes++] = DATA_SIZE_1BIT;
+		buffer[noOfBytes++] = SEND_ACK;
+	}
+	else
+	{
+		/* We will release the ACK bit to a '1' so pre-set pin to a '1' by making it an input */
+		buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
+		buffer[noOfBytes++] = VALUE_SCLLOW_SDALOW;
+		buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAIN;
+
+		/* Clock out the ack bit as a '1' on negative edge - never actually seen on line since SDA is input but burns off one bit time */
+		buffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
+		buffer[noOfBytes++] = DATA_SIZE_1BIT;
+		buffer[noOfBytes++] = SEND_NACK;
+	}
+
+	/* Back to Idle */
+	buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
+	buffer[noOfBytes++] = VALUE_SCLLOW_SDALOW;
+	buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAIN;
+
+	/* Command MPSSE to send data to PC immediately */
 	buffer[noOfBytes++] = MPSSE_CMD_SEND_IMMEDIATE;
-
-	/* Fix introduced to solve a glitch issue */
-	buffer[noOfBytes++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;  
-	buffer[noOfBytes++] = VALUE_SCLLOW_SDALOW ; 
-	buffer[noOfBytes++] = DIRECTION_SCLOUT_SDAOUT;
-	
-	/* Burn off one I2C bit time */
-	buffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
-	buffer[noOfBytes++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/  
-    buffer[noOfBytes++] = ack ? SEND_ACK : SEND_NACK;/*Only MSB is sent*/
 
 	status = FT_Channel_Write(I2C, handle, noOfBytes, buffer, &noOfBytesTransferred);
 	if (FT_OK != status)
@@ -1150,6 +1260,8 @@ static FT_STATUS I2C_FastWrite(FT_HANDLE handle, UCHAR deviceAddress,
 		outBuffer[i++] = DIRECTION_SCLIN_SDAIN; /* Tristate the SCL & SDA pins */
 	}
 
+	assert(i <= sizeTotal); 
+
 	/* write buffer */
 	DBG(MSG_DEBUG,"i=%u bitsToTransfer=%u bitsInThisTransfer=%u\n", (unsigned)i,
 	(unsigned)bitsToTransfer,(unsigned)bitsInThisTransfer);
@@ -1304,23 +1416,20 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 		outBuffer[i++] = bitsInThisTransfer - 1;
 
 		/*Command MPSSE to send data to PC immediately */
-        outBuffer[i++] = MPSSE_CMD_SEND_IMMEDIATE;
+		/*buffer[i++] = MPSSE_CMD_SEND_IMMEDIATE;*/
 
 		/* Write 1bit ack after each 8bits read - only in byte mode */
 		if (options & I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES)
 		{
 			outBuffer[i++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
 			outBuffer[i++] = VALUE_SCLLOW_SDALOW ;  
-			outBuffer[i++] = DIRECTION_SCLOUT_SDAOUT;
+			outBuffer[i++] = DIRECTION_SCLOUT_SDAIN;
 
         // Burn off one I2C bit time
-        outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
-        outBuffer[i++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/
-        uint8 ack = (j<(bitsToTransfer-8))?(SEND_ACK):	\
+       outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;                                                                      //
+			outBuffer[i++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/ 
+        outBuffer[i++] = (j<(bitsToTransfer-1))?(SEND_ACK):	\
 			((options & I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE)?SEND_NACK:SEND_ACK);
-        DBG(MSG_DEBUG,"ACK=%u bitsToTransfer=%u bitsInThisTransfer=%u\n",
-            (unsigned)ack, (unsigned)bitsToTransfer, (unsigned)bitsInThisTransfer);
-        outBuffer[i++] = ack;
 		}
 		j+= bitsInThisTransfer;
 	}
@@ -1418,29 +1527,213 @@ static FT_STATUS I2C_WriteDeviceAddress(FT_HANDLE handle, UCHAR deviceAddress,
 	return status;
 }
 
+
+static FT_STATUS I2C_AddChannelConfig(FT_HANDLE handle)
+{
+	FT_STATUS status = FT_OTHER_ERROR;
+	ChannelContext *tempNode = NULL;
+	ChannelContext *lastNode = NULL;
+	FN_ENTER;
+	DBG(MSG_DEBUG,"line %u handle = 0x%x\n", __LINE__,(unsigned)handle);
+
+#ifdef NO_LINKED_LIST
+	status = FT_OK;
+#else
+	if (NULL == gListHead )
+	{/* Add first node */
+		gListHead  = (ChannelContext *) INFRA_MALLOC(sizeof(ChannelContext));
+		if (NULL == gListHead )
+		{
+			status = FT_INSUFFICIENT_RESOURCES;
+			DBG(MSG_ERR,"Failed allocating memory\n");
+		}
+		else
+		{
+			gListHead ->handle = handle;
+			gListHead ->next = NULL;
+			status = FT_OK;
+		}
+	}
+	else
+	{/* Add subsequent nodes */
+		/* Traverse list */
+		for (tempNode = gListHead ; NULL != tempNode; tempNode = tempNode->next)
+		{
+			lastNode = tempNode;
+		}
+		tempNode = (ChannelContext *) INFRA_MALLOC(sizeof(ChannelContext));
+		if (NULL == tempNode)
+		{
+			status = FT_INSUFFICIENT_RESOURCES;
+			DBG(MSG_ERR,"Failed allocating memory\n");
+		}
+		else
+		{
+			tempNode->handle = handle;
+			tempNode->next = NULL;
+			lastNode->next = tempNode;
+			status = FT_OK;
+		}
+	}
+#endif
+	FN_EXIT;
+#ifdef INFRA_DEBUG_ENABLE
+	I2C_DisplayList();
+#endif
+	return status;
+}
+
+static FT_STATUS I2C_DelChannelConfig(FT_HANDLE handle)
+{
+	FT_STATUS status = FT_OTHER_ERROR;
+	ChannelContext *tempNode;
+	ChannelContext *lastNode = NULL;
+	FN_ENTER;
+
+#ifdef NO_LINKED_LIST
+	status = FT_OK;
+#else
+	if (NULL == gListHead )
+	{
+		DBG(MSG_NOTICE,"List is empty\n");
+	}
+	else
+	{
+		for (tempNode = gListHead ; NULL != tempNode;
+			lastNode = tempNode, tempNode = tempNode->next)
+		{
+			if (tempNode->handle == handle)
+			{/*Node found*/
+				if (tempNode == gListHead )
+				{/* Is the first node */
+					
+					gListHead  = tempNode->next;
+					INFRA_FREE(tempNode);
+				}
+				else if (NULL == tempNode->next)
+				{/*Last node*/
+					lastNode->next = NULL;
+					INFRA_FREE(tempNode);
+				}
+				else
+				{/* Middle node */
+					lastNode->next = tempNode->next;
+					INFRA_FREE(tempNode);
+				}
+				status = FT_OK;
+				break;
+			}
+		}
+	}
+#endif
+	status = FT_OK;
+	FN_EXIT;
+#ifdef INFRA_DEBUG_ENABLE
+	I2C_DisplayList();
+#endif
+	return status;
+}
+
 static FT_STATUS I2C_SaveChannelConfig(FT_HANDLE handle, ChannelConfig *config)
 {
 	FT_STATUS status = FT_OTHER_ERROR;
+	ChannelContext *tempNode = NULL;
 	FN_ENTER;
 
-	status = FT_OK;
+#ifdef NO_LINKED_LIST
+		memcpy(&channelContext.config, config, sizeof(ChannelConfig));
+		channelContext.handle = handle;
+		status = FT_OK;
+#else
+	if (NULL == gListHead )
+	{
+		DBG(MSG_NOTICE,"List is empty\n");
+	}
+	else
+	{
+		tempNode = gListHead ;
+		for (tempNode = gListHead ; 0 != tempNode; tempNode = tempNode->next)
+		{
+			DBG(MSG_DEBUG,"line=%d tempNode->handle = 0x%x handle = 0x%x tempNode->\
+				next = 0x%x\n", __LINE__,(unsigned)tempNode->handle,
+				(unsigned)handle, (unsigned)tempNode->next);
+			if (tempNode->handle == handle)
+			{/*Node found*/
+				INFRA_MEMCPY(&(tempNode->config), config, sizeof(ChannelConfig));
+				status = FT_OK;
+			}
+		}
+	}
+#endif
+
 	FN_EXIT;
+#ifdef INFRA_DEBUG_ENABLE
+	I2C_DisplayList();
+#endif
 	return status;
 }
 
-#ifdef I2C_CMD_GETDEVICEID_SUPPORTED
-static FT_STATUS I2C_GetChannelConfig(FT_HANDLE handle, ChannelConfig *config)
+static FT_STATUS I2C_GetChannelConfig(FT_HANDLE handle, ChannelConfig **config)
 {
 	FT_STATUS status = FT_OTHER_ERROR;
-	
+	ChannelContext *tempNode = NULL;
 	FN_ENTER;
 
-	status = FT_OK;
-	
+#ifdef NO_LINKED_LIST
+		if (handle == channelContext.handle)
+		{
+			*config= &(channelContext.config);
+			status = FT_OK;
+		}
+		else
+			DBG(MSG_DEBUG,"handle not found in channel config list\n");
+#else
+	if (NULL == gListHead )
+	{
+		DBG(MSG_NOTICE,"List is empty\n");
+	}
+	else
+	{
+		for (tempNode = gListHead ; NULL != tempNode; tempNode = tempNode->next)
+		{
+			if (tempNode->handle == handle)
+			{/*Node found*/
+				*config = &(tempNode->config);
+				status = FT_OK;
+			}
+		}
+	}
+#endif
+
+	FN_EXIT;
+#ifdef INFRA_DEBUG_ENABLE
+	I2C_DisplayList();
+#endif
+	return status;
+}
+
+#ifdef INFRA_DEBUG_ENABLE
+static FT_STATUS I2C_DisplayList(void)
+{
+	FT_STATUS status = FT_OTHER_ERROR;
+	ChannelContext *tempNode = NULL;
+	FN_ENTER;
+	printf("%s:%d:%s():\n", __FILE__, __LINE__, __FUNCTION__);
+	for (tempNode = gListHead ; 0 != tempNode; tempNode = tempNode->next)
+	{
+		//if (currentDebugLevel>=MSG_DEBUG)
+		{
+			printf("\ttempNode->handle = 0x%x\n",(unsigned)tempNode->handle);
+			printf("\ttempNode-->next = 0x%x\n",(unsigned)tempNode->next);
+			printf("\ttempNode->config->ClockRate=%u\n",
+				(unsigned)tempNode->config.ClockRate);
+		}
+	}
+	printf("------------------------------------------------------\n");
 	FN_EXIT;
 	return status;
 }
-#endif // I2C_CMD_GETDEVICEID_SUPPORTED
+#endif
 
 static FT_STATUS I2C_Start(FT_HANDLE handle)
 {
