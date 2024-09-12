@@ -5,6 +5,7 @@
 #include <thread>
 
 #include <ftd2xx.h>
+#include <ftdi_common.h>
 #include <libmpsse_i2c.h>
 
 #include "Haptics_2605.h"

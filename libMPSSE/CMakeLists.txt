@@ -1,5 +1,5 @@
 # Set min req version of Cmake
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.27)
 
 # Set the project name
 project(FTDI_MPSSE_Lib VERSION 1.0.5)

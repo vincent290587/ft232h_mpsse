@@ -5,6 +5,7 @@
 #include <thread>
 
 #include <ftd2xx.h>
+#include <ftdi_common.h>
 #include <libmpsse_i2c.h>
 #include "hal_i2c.h"
 #include "lsm6ds3_wrapper.h"
